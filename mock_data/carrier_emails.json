@@ -1,0 +1,24 @@
+[
+  {
+    "email_id": "EM-0001",
+    "shipment_id": "SH-3001",
+    "from": "operations@maersk.com",
+    "to": "procurement@company.com",
+    "received_at": "2026-07-05T14:30:00",
+    "subject": "Delay Notice - Shipment SH-3001",
+    "body": "Dear Customer,\n\nWe regret to inform you that shipment SH-3001 carrying Steel Coils from Mumbai, India is experiencing a delay of approximately 5 days due to customs inspection hold at Suez Canal. We are working to minimize the impact.\n\nUpdated ETA: 2026-07-20\n\nBest regards,\nMaersk Operations Team",
+    "delay_days_mentioned": 5,
+    "reason": "customs inspection hold"
+  },
+  {
+    "email_id": "EM-0002",
+    "shipment_id": "SH-3005",
+    "from": "logistics@kuehne-nagel.com",
+    "to": "procurement@company.com",
+    "received_at": "2026-07-06T09:15:00",
+    "subject": "URGENT: Shipment SH-3005 Disruption",
+    "body": "ALERT: Shipment SH-3005 (Carbon Fiber Sheets, Kuehne+Nagel) is currently stalled at Port of Singapore \u2014 awaiting berth. Root cause: port congestion. Estimated delay: 4 business days. Revised delivery: 2026-07-26.\n\nPlease advise on priority handling.\n\nRegards,\nKuehne+Nagel Control Tower",
+    "delay_days_mentioned": 4,
+    "reason": "port congestion"
+  }
+]
