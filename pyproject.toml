@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "supply-chain-agent"
@@ -13,7 +13,7 @@ dependencies = [
     # Microsoft Agent Framework 1.0 (installs core + all sub-packages)
     "agent-framework>=1.0.0",
     # Azure AI Foundry integration (still in preview as of July 2026)
-    "agent-framework-azure-ai --pre",
+    "agent-framework-azure-ai>=1.0.0rc1",
 
     # Azure SDKs
     "azure-identity>=1.17.0",
