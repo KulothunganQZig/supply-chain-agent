@@ -15,7 +15,7 @@ from pathlib import Path
 from src.db import async_session, create_tables
 from src.models.erp import PurchaseOrder, PurchaseOrderTable
 from src.models.shipment import Shipment, ShipmentTable
-
+from src.models.inventory import Inventory, InventoryTable
 async def seed_purchase_orders() -> None:
     """Load PO records from JSON, validate, and insert into the database."""
 
@@ -71,6 +71,7 @@ async def seed_purchase_orders() -> None:
         for row in rows:
             print(f"  {row}")
     await seed_shipments()
+    await seed_inventory()
 
 async def seed_shipments() -> None:
     """Load Shipment records from JSON, validate, and insert."""
@@ -111,6 +112,43 @@ async def seed_shipments() -> None:
         )
         rows = result.scalars().all()
         print(f"\n=== Verification: {len(rows)} rows in shipments table ===")
+        for row in rows:
+            print(f"  {row}")
+
+async def seed_inventory() -> None:
+    """Load Inventory records from JSON, validate, and insert."""
+    json_path = Path("mock_data/inventory.json")
+    if not json_path.exists():
+        print("ERROR: mock_data/inventory.json not found.")
+        return
+
+    raw_data = json.loads(json_path.read_text())
+    print(f"\nRead {len(raw_data)} inventory records from {json_path}")
+
+    validated = [Inventory.model_validate(r) for r in raw_data]
+    for inv in validated:
+        print(f"  Validated: {inv.plant} — {inv.material} (dos={inv.days_of_supply}d)")
+
+    async with async_session() as session:
+        for inv in validated:
+            orm_obj = InventoryTable(
+                plant=inv.plant,
+                material=inv.material,
+                current_stock=inv.current_stock,
+                safety_stock=inv.safety_stock,
+                daily_consumption=inv.daily_consumption,
+            )
+            await session.merge(orm_obj)
+        await session.commit()
+        print(f"Inserted/updated {len(validated)} inventory records.")
+
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(InventoryTable).order_by(InventoryTable.plant)
+        )
+        rows = result.scalars().all()
+        print(f"\n=== Verification: {len(rows)} rows in inventory table ===")
         for row in rows:
             print(f"  {row}")
 

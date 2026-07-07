@@ -1,0 +1,37 @@
+[
+  {
+    "plant": "Plant-Detroit",
+    "material": "Steel Coils",
+    "current_stock": 150,
+    "safety_stock": 500,
+    "daily_consumption": 80.0
+  },
+  {
+    "plant": "Plant-Chicago",
+    "material": "Polymer Resin",
+    "current_stock": 3000,
+    "safety_stock": 1000,
+    "daily_consumption": 100.0
+  },
+  {
+    "plant": "Plant-Houston",
+    "material": "Battery Cells",
+    "current_stock": 90,
+    "safety_stock": 200,
+    "daily_consumption": 30.0
+  },
+  {
+    "plant": "Plant-Chicago",
+    "material": "Adhesive Compound",
+    "current_stock": 2500,
+    "safety_stock": 600,
+    "daily_consumption": 50.0
+  },
+  {
+    "plant": "Plant-Munich",
+    "material": "Carbon Fiber Sheets",
+    "current_stock": 60,
+    "safety_stock": 150,
+    "daily_consumption": 25.0
+  }
+]

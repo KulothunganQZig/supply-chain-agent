@@ -1,26 +1,19 @@
-"""Mock data generator — Purchase Orders.
-
-Generates 5 curated PO records with deliberate variety:
-    - PO-1001: Critical priority, tight deadline   (will become a delayed shipment)
-    - PO-1002: Medium priority, comfortable buffer  (healthy shipment)
-    - PO-1003: High priority, overseas supplier     (GPS anomaly candidate)
-    - PO-1004: Low priority, domestic               (healthy shipment)
-    - PO-1005: Critical priority, long transit       (email warning candidate)
-
-Each record is validated through the Pydantic model before output.
+"""Mock data generator — Purchase Orders, Shipments, Inventory.
 
 Usage:
     python -m mock_data.generate
 """
 
 import json
-from pathlib import Path
 from datetime import date, datetime
+from pathlib import Path
 
 from src.models.erp import Priority, PurchaseOrder
+from src.models.shipment import Shipment, ShipmentStatus, TransportMode
+from src.models.inventory import Inventory
 
 # ---------------------------------------------------------------------------
-# Hand-curated PO records
+# Purchase Orders
 # ---------------------------------------------------------------------------
 
 PURCHASE_ORDERS = [
@@ -76,7 +69,9 @@ PURCHASE_ORDERS = [
     ),
 ]
 
-from src.models.shipment import Shipment, ShipmentStatus, TransportMode
+# ---------------------------------------------------------------------------
+# Shipments
+# ---------------------------------------------------------------------------
 
 SHIPMENTS = [
     Shipment(
@@ -141,17 +136,66 @@ SHIPMENTS = [
     ),
 ]
 
+# ---------------------------------------------------------------------------
+# Inventory (calibrated: some items deliberately low stock)
+# ---------------------------------------------------------------------------
+
+INVENTORY = [
+    Inventory(
+        plant="Plant-Detroit",
+        material="Steel Coils",
+        current_stock=150,
+        safety_stock=500,
+        daily_consumption=80.0,
+    ),
+    Inventory(
+        plant="Plant-Chicago",
+        material="Polymer Resin",
+        current_stock=3000,
+        safety_stock=1000,
+        daily_consumption=100.0,
+    ),
+    Inventory(
+        plant="Plant-Houston",
+        material="Battery Cells",
+        current_stock=90,
+        safety_stock=200,
+        daily_consumption=30.0,
+    ),
+    Inventory(
+        plant="Plant-Chicago",
+        material="Adhesive Compound",
+        current_stock=2500,
+        safety_stock=600,
+        daily_consumption=50.0,
+    ),
+    Inventory(
+        plant="Plant-Munich",
+        material="Carbon Fiber Sheets",
+        current_stock=60,
+        safety_stock=150,
+        daily_consumption=25.0,
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Generators
+# ---------------------------------------------------------------------------
 
 def generate_purchase_orders() -> list[dict]:
-    """Validate and serialize all PO records."""
     return [po.model_dump(mode="json") for po in PURCHASE_ORDERS]
 
+
 def generate_shipments() -> list[dict]:
-    """Validate and serialize all Shipment records."""
     return [s.model_dump(mode="json") for s in SHIPMENTS]
 
+
+def generate_inventory() -> list[dict]:
+    return [inv.model_dump(mode="json") for inv in INVENTORY]
+
+
 def write_to_file(data: list[dict], filepath: Path) -> None:
-    """Write records as pretty-printed JSON."""
     filepath.parent.mkdir(parents=True, exist_ok=True)
     filepath.write_text(json.dumps(data, indent=2, default=str))
     print(f"  {filepath} — {len(data)} records")
@@ -166,18 +210,32 @@ def main() -> None:
     sh_data = generate_shipments()
     write_to_file(sh_data, Path("mock_data/shipments.json"))
 
+    print("Generating Inventory...")
+    inv_data = generate_inventory()
+    write_to_file(inv_data, Path("mock_data/inventory.json"))
+
     print("\n=== Summary ===")
     for po in PURCHASE_ORDERS:
         days_until_due = (po.required_delivery_date - date(2026, 7, 7)).days
         print(
             f"  {po.po_id} | {po.material:<22} | {po.priority.value:<8} | Due in {days_until_due:>2}d"
         )
+
     print()
     for sh in SHIPMENTS:
         print(
             f"  {sh.shipment_id} → {sh.po_id} | {sh.carrier:<16} | {sh.mode.value:<6} | {sh.status.value}"
         )
-    print(f"\nTotal: {len(po_data)} POs, {len(sh_data)} shipments.")
+
+    print()
+    for inv in INVENTORY:
+        flag = " ⚠ LOW" if inv.below_safety_stock else ""
+        print(
+            f"  {inv.plant:<16} | {inv.material:<22} | "
+            f"stock={inv.current_stock:>5} | dos={inv.days_of_supply:>5}d{flag}"
+        )
+
+    print(f"\nTotal: {len(po_data)} POs, {len(sh_data)} shipments, {len(inv_data)} inventory.")
 
 
 if __name__ == "__main__":
