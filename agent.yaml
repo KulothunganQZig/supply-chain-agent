@@ -1,0 +1,11 @@
+$schema: https://aka.ms/agent-framework/agent-manifest-schema
+name: supply-chain-visibility-agent
+description: >
+  Autonomous supply chain visibility and disruption management agent.
+  Detects shipment risks, evaluates business impact, and executes
+  mitigation actions or escalates to humans.
+version: 0.1.0
+runtime:
+  language: python
+  entrypoint: src.main
+  port: 8088
