@@ -1,13 +1,21 @@
 """Executor 1: Data Ingestion Agent.
 
-Reads shipment tracking data, ERP data, and email communications.
-Normalizes and enriches raw data into a unified IngestedData message.
+Reads all supply chain data from SQLite, validates through Pydantic,
+and assembles into an IngestedData message for the risk detection executor.
 """
 
 import logging
 
+from sqlalchemy import select
+from typing_extensions import Never
+
 from agent_framework import Executor, WorkflowContext, handler
 
+from src.db import async_session
+from src.models.email import CarrierEmail, CarrierEmailTable
+from src.models.gps import GPSReading, GPSReadingTable
+from src.models.milestone import Milestone, MilestoneTable
+from src.models.shipment import Shipment, ShipmentTable
 from src.state import IngestedData
 
 logger = logging.getLogger("supply_chain_agent.ingestion")
@@ -16,29 +24,81 @@ logger = logging.getLogger("supply_chain_agent.ingestion")
 class IngestionExecutor(Executor):
     """Fetches and normalizes data from all supply chain sources.
 
-    Tools (Phase 2):
-        - query_erp: Fetch POs, SOs, inventory, shipments, milestones from Azure SQL
-        - parse_email: Search and parse carrier emails via Azure AI Search
-        - fetch_gps: Read latest GPS readings from Event Hubs or file mock
+    Reads from SQLite (local dev) or Azure SQL (production) — same code,
+    different DATABASE_URL in .env.
     """
 
     @handler
-    async def process(self, message: IngestedData, ctx: WorkflowContext[IngestedData]) -> None:
-        """Fetch data from all sources and forward to risk detection."""
-        logger.info("Ingestion agent starting — fetching data from all sources...")
+    async def process(self, message: str, ctx: WorkflowContext[IngestedData]) -> None:
+        """Fetch data from the database and forward to risk detection.
 
-        # TODO Phase 2: Replace with actual data fetching via @tool functions
-        # 1. Query Azure SQL for active shipments with upcoming delivery dates
-        # 2. Fetch recent milestones for those shipments
-        # 3. Pull latest GPS readings from Event Hubs consumer / file mock
-        # 4. Search Azure AI Search for recent carrier emails mentioning delays
+        Accepts a str trigger message (e.g. "run") from the workflow entrypoint.
+        """
+        logger.info("Ingestion agent starting — fetching data from database...")
 
-        logger.info(
-            f"Ingestion complete: {len(message.shipments)} shipments, "
-            f"{len(message.milestones)} milestones, "
-            f"{len(message.gps_readings)} GPS readings, "
-            f"{len(message.email_summaries)} email signals"
+        # 1. Fetch active shipments (not delivered)
+        async with async_session() as session:
+            result = await session.execute(
+                select(ShipmentTable).where(ShipmentTable.status != "delivered")
+            )
+            shipment_rows = result.scalars().all()
+
+        shipments = [Shipment.model_validate(row) for row in shipment_rows]
+        logger.info(f"  Fetched {len(shipments)} active shipments")
+
+        # 2. Fetch milestones for those shipments
+        shipment_ids = [s.shipment_id for s in shipments]
+        async with async_session() as session:
+            result = await session.execute(
+                select(MilestoneTable).where(MilestoneTable.shipment_id.in_(shipment_ids))
+            )
+            milestone_rows = result.scalars().all()
+
+        milestones = [Milestone.model_validate(row) for row in milestone_rows]
+        logger.info(f"  Fetched {len(milestones)} milestones")
+
+        # 3. Fetch GPS readings
+        async with async_session() as session:
+            result = await session.execute(
+                select(GPSReadingTable).where(GPSReadingTable.shipment_id.in_(shipment_ids))
+            )
+            gps_rows = result.scalars().all()
+
+        gps_readings = [GPSReading.model_validate(row) for row in gps_rows]
+        logger.info(f"  Fetched {len(gps_readings)} GPS readings")
+
+        # 4. Fetch carrier emails
+        async with async_session() as session:
+            result = await session.execute(
+                select(CarrierEmailTable).where(
+                    CarrierEmailTable.shipment_id.in_(shipment_ids)
+                )
+            )
+            email_rows = result.scalars().all()
+
+        email_summaries = []
+        for row in email_rows:
+            email_summaries.append({
+                "email_id": row.email_id,
+                "shipment_id": row.shipment_id,
+                "subject": row.subject,
+                "delay_days_mentioned": row.delay_days_mentioned,
+                "reason": row.reason,
+            })
+        logger.info(f"  Fetched {len(email_summaries)} carrier emails")
+
+        # 5. Assemble and forward
+        ingested = IngestedData(
+            shipments=shipments,
+            milestones=milestones,
+            gps_readings=gps_readings,
+            email_summaries=email_summaries,
         )
 
-        # Forward populated data to next executor (RiskDetection)
-        await ctx.send_message(message)
+        logger.info(
+            f"Ingestion complete: {len(shipments)} shipments, "
+            f"{len(milestones)} milestones, {len(gps_readings)} GPS, "
+            f"{len(email_summaries)} emails"
+        )
+
+        await ctx.send_message(ingested)
