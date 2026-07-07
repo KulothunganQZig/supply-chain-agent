@@ -1,0 +1,50 @@
+[
+  {
+    "so_id": "SO-2001",
+    "customer": "AutoCorp Inc.",
+    "material": "Steel Coils",
+    "quantity": 400,
+    "delivery_commitment_date": "2026-07-18",
+    "priority": "critical"
+  },
+  {
+    "so_id": "SO-2002",
+    "customer": "BuildTech Solutions",
+    "material": "Polymer Resin",
+    "quantity": 600,
+    "delivery_commitment_date": "2026-08-05",
+    "priority": "medium"
+  },
+  {
+    "so_id": "SO-2003",
+    "customer": "NextGen Motors",
+    "material": "Battery Cells",
+    "quantity": 250,
+    "delivery_commitment_date": "2026-07-22",
+    "priority": "high"
+  },
+  {
+    "so_id": "SO-2004",
+    "customer": "GlobalParts Ltd.",
+    "material": "Adhesive Compound",
+    "quantity": 500,
+    "delivery_commitment_date": "2026-08-15",
+    "priority": "low"
+  },
+  {
+    "so_id": "SO-2005",
+    "customer": "Precision Manufacturing Co.",
+    "material": "Carbon Fiber Sheets",
+    "quantity": 150,
+    "delivery_commitment_date": "2026-07-28",
+    "priority": "critical"
+  },
+  {
+    "so_id": "SO-2006",
+    "customer": "Atlas Industries",
+    "material": "Steel Coils",
+    "quantity": 300,
+    "delivery_commitment_date": "2026-07-25",
+    "priority": "high"
+  }
+]

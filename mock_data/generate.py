@@ -1,4 +1,4 @@
-"""Mock data generator — Purchase Orders, Shipments, Inventory.
+"""Mock data generator — Purchase Orders, Shipments, Inventory, Sales Orders.
 
 Usage:
     python -m mock_data.generate
@@ -11,6 +11,7 @@ from pathlib import Path
 from src.models.erp import Priority, PurchaseOrder
 from src.models.shipment import Shipment, ShipmentStatus, TransportMode
 from src.models.inventory import Inventory
+from src.models.sales_order import SalesOrder
 
 # ---------------------------------------------------------------------------
 # Purchase Orders
@@ -137,7 +138,7 @@ SHIPMENTS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Inventory (calibrated: some items deliberately low stock)
+# Inventory
 # ---------------------------------------------------------------------------
 
 INVENTORY = [
@@ -178,6 +179,61 @@ INVENTORY = [
     ),
 ]
 
+# ---------------------------------------------------------------------------
+# Sales Orders (demand side — links materials to customers)
+# ---------------------------------------------------------------------------
+
+SALES_ORDERS = [
+    SalesOrder(
+        so_id="SO-2001",
+        customer="AutoCorp Inc.",
+        material="Steel Coils",
+        quantity=400,
+        delivery_commitment_date=date(2026, 7, 18),
+        priority=Priority.CRITICAL,
+    ),
+    SalesOrder(
+        so_id="SO-2002",
+        customer="BuildTech Solutions",
+        material="Polymer Resin",
+        quantity=600,
+        delivery_commitment_date=date(2026, 8, 5),
+        priority=Priority.MEDIUM,
+    ),
+    SalesOrder(
+        so_id="SO-2003",
+        customer="NextGen Motors",
+        material="Battery Cells",
+        quantity=250,
+        delivery_commitment_date=date(2026, 7, 22),
+        priority=Priority.HIGH,
+    ),
+    SalesOrder(
+        so_id="SO-2004",
+        customer="GlobalParts Ltd.",
+        material="Adhesive Compound",
+        quantity=500,
+        delivery_commitment_date=date(2026, 8, 15),
+        priority=Priority.LOW,
+    ),
+    SalesOrder(
+        so_id="SO-2005",
+        customer="Precision Manufacturing Co.",
+        material="Carbon Fiber Sheets",
+        quantity=150,
+        delivery_commitment_date=date(2026, 7, 28),
+        priority=Priority.CRITICAL,
+    ),
+    SalesOrder(
+        so_id="SO-2006",
+        customer="Atlas Industries",
+        material="Steel Coils",
+        quantity=300,
+        delivery_commitment_date=date(2026, 7, 25),
+        priority=Priority.HIGH,
+    ),
+]
+
 
 # ---------------------------------------------------------------------------
 # Generators
@@ -193,6 +249,10 @@ def generate_shipments() -> list[dict]:
 
 def generate_inventory() -> list[dict]:
     return [inv.model_dump(mode="json") for inv in INVENTORY]
+
+
+def generate_sales_orders() -> list[dict]:
+    return [so.model_dump(mode="json") for so in SALES_ORDERS]
 
 
 def write_to_file(data: list[dict], filepath: Path) -> None:
@@ -213,6 +273,10 @@ def main() -> None:
     print("Generating Inventory...")
     inv_data = generate_inventory()
     write_to_file(inv_data, Path("mock_data/inventory.json"))
+
+    print("Generating Sales Orders...")
+    so_data = generate_sales_orders()
+    write_to_file(so_data, Path("mock_data/sales_orders.json"))
 
     print("\n=== Summary ===")
     for po in PURCHASE_ORDERS:
@@ -235,7 +299,17 @@ def main() -> None:
             f"stock={inv.current_stock:>5} | dos={inv.days_of_supply:>5}d{flag}"
         )
 
-    print(f"\nTotal: {len(po_data)} POs, {len(sh_data)} shipments, {len(inv_data)} inventory.")
+    print()
+    for so in SALES_ORDERS:
+        days_until_commit = (so.delivery_commitment_date - date(2026, 7, 7)).days
+        print(
+            f"  {so.so_id} | {so.customer:<28} | {so.material:<22} | {so.priority.value:<8} | Commit in {days_until_commit:>2}d"
+        )
+
+    print(
+        f"\nTotal: {len(po_data)} POs, {len(sh_data)} shipments, "
+        f"{len(inv_data)} inventory, {len(so_data)} sales orders."
+    )
 
 
 if __name__ == "__main__":
