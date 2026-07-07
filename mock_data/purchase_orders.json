@@ -1,0 +1,52 @@
+[
+  {
+    "po_id": "PO-1001",
+    "supplier": "Tata Steel",
+    "material": "Steel Coils",
+    "quantity": 500,
+    "origin": "Mumbai, India",
+    "destination_plant": "Plant-Detroit",
+    "required_delivery_date": "2026-07-15",
+    "priority": "critical"
+  },
+  {
+    "po_id": "PO-1002",
+    "supplier": "BASF",
+    "material": "Polymer Resin",
+    "quantity": 1200,
+    "origin": "Ludwigshafen, Germany",
+    "destination_plant": "Plant-Chicago",
+    "required_delivery_date": "2026-08-01",
+    "priority": "medium"
+  },
+  {
+    "po_id": "PO-1003",
+    "supplier": "Samsung SDI",
+    "material": "Battery Cells",
+    "quantity": 300,
+    "origin": "Ulsan, South Korea",
+    "destination_plant": "Plant-Houston",
+    "required_delivery_date": "2026-07-20",
+    "priority": "high"
+  },
+  {
+    "po_id": "PO-1004",
+    "supplier": "Dow Chemical",
+    "material": "Adhesive Compound",
+    "quantity": 800,
+    "origin": "Houston, USA",
+    "destination_plant": "Plant-Chicago",
+    "required_delivery_date": "2026-08-10",
+    "priority": "low"
+  },
+  {
+    "po_id": "PO-1005",
+    "supplier": "Sinopec",
+    "material": "Carbon Fiber Sheets",
+    "quantity": 200,
+    "origin": "Beijing, China",
+    "destination_plant": "Plant-Munich",
+    "required_delivery_date": "2026-07-25",
+    "priority": "critical"
+  }
+]
