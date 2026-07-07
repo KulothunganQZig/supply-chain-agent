@@ -1,0 +1,62 @@
+[
+  {
+    "shipment_id": "SH-3001",
+    "po_id": "PO-1001",
+    "carrier": "Maersk",
+    "mode": "ocean",
+    "origin": "Mumbai, India",
+    "destination": "Detroit, USA",
+    "planned_departure": "2026-06-25T08:00:00",
+    "planned_arrival": "2026-07-15T18:00:00",
+    "current_location": "Held at customs \u2014 Suez Canal",
+    "status": "delayed"
+  },
+  {
+    "shipment_id": "SH-3002",
+    "po_id": "PO-1002",
+    "carrier": "DB Schenker",
+    "mode": "rail",
+    "origin": "Ludwigshafen, Germany",
+    "destination": "Chicago, USA",
+    "planned_departure": "2026-06-28T06:00:00",
+    "planned_arrival": "2026-07-10T14:00:00",
+    "current_location": "En route \u2014 mid-Atlantic",
+    "status": "in_transit"
+  },
+  {
+    "shipment_id": "SH-3003",
+    "po_id": "PO-1003",
+    "carrier": "DHL Global",
+    "mode": "ocean",
+    "origin": "Ulsan, South Korea",
+    "destination": "Houston, USA",
+    "planned_departure": "2026-06-22T10:00:00",
+    "planned_arrival": "2026-07-18T20:00:00",
+    "current_location": "Near Guam \u2014 GPS stall detected",
+    "status": "in_transit"
+  },
+  {
+    "shipment_id": "SH-3004",
+    "po_id": "PO-1004",
+    "carrier": "FedEx Freight",
+    "mode": "truck",
+    "origin": "Houston, USA",
+    "destination": "Chicago, USA",
+    "planned_departure": "2026-07-03T07:00:00",
+    "planned_arrival": "2026-07-08T15:00:00",
+    "current_location": "En route \u2014 near Dallas, TX",
+    "status": "in_transit"
+  },
+  {
+    "shipment_id": "SH-3005",
+    "po_id": "PO-1005",
+    "carrier": "Kuehne+Nagel",
+    "mode": "ocean",
+    "origin": "Beijing, China",
+    "destination": "Munich, Germany",
+    "planned_departure": "2026-06-20T12:00:00",
+    "planned_arrival": "2026-07-22T08:00:00",
+    "current_location": "Port of Singapore \u2014 awaiting berth",
+    "status": "in_transit"
+  }
+]

@@ -14,8 +14,8 @@ Usage:
 """
 
 import json
-from datetime import date
 from pathlib import Path
+from datetime import date, datetime
 
 from src.models.erp import Priority, PurchaseOrder
 
@@ -76,11 +76,79 @@ PURCHASE_ORDERS = [
     ),
 ]
 
+from src.models.shipment import Shipment, ShipmentStatus, TransportMode
+
+SHIPMENTS = [
+    Shipment(
+        shipment_id="SH-3001",
+        po_id="PO-1001",
+        carrier="Maersk",
+        mode=TransportMode.OCEAN,
+        origin="Mumbai, India",
+        destination="Detroit, USA",
+        planned_departure=datetime(2026, 6, 25, 8, 0),
+        planned_arrival=datetime(2026, 7, 15, 18, 0),
+        current_location="Held at customs — Suez Canal",
+        status=ShipmentStatus.DELAYED,
+    ),
+    Shipment(
+        shipment_id="SH-3002",
+        po_id="PO-1002",
+        carrier="DB Schenker",
+        mode=TransportMode.RAIL,
+        origin="Ludwigshafen, Germany",
+        destination="Chicago, USA",
+        planned_departure=datetime(2026, 6, 28, 6, 0),
+        planned_arrival=datetime(2026, 7, 10, 14, 0),
+        current_location="En route — mid-Atlantic",
+        status=ShipmentStatus.IN_TRANSIT,
+    ),
+    Shipment(
+        shipment_id="SH-3003",
+        po_id="PO-1003",
+        carrier="DHL Global",
+        mode=TransportMode.OCEAN,
+        origin="Ulsan, South Korea",
+        destination="Houston, USA",
+        planned_departure=datetime(2026, 6, 22, 10, 0),
+        planned_arrival=datetime(2026, 7, 18, 20, 0),
+        current_location="Near Guam — GPS stall detected",
+        status=ShipmentStatus.IN_TRANSIT,
+    ),
+    Shipment(
+        shipment_id="SH-3004",
+        po_id="PO-1004",
+        carrier="FedEx Freight",
+        mode=TransportMode.TRUCK,
+        origin="Houston, USA",
+        destination="Chicago, USA",
+        planned_departure=datetime(2026, 7, 3, 7, 0),
+        planned_arrival=datetime(2026, 7, 8, 15, 0),
+        current_location="En route — near Dallas, TX",
+        status=ShipmentStatus.IN_TRANSIT,
+    ),
+    Shipment(
+        shipment_id="SH-3005",
+        po_id="PO-1005",
+        carrier="Kuehne+Nagel",
+        mode=TransportMode.OCEAN,
+        origin="Beijing, China",
+        destination="Munich, Germany",
+        planned_departure=datetime(2026, 6, 20, 12, 0),
+        planned_arrival=datetime(2026, 7, 22, 8, 0),
+        current_location="Port of Singapore — awaiting berth",
+        status=ShipmentStatus.IN_TRANSIT,
+    ),
+]
+
 
 def generate_purchase_orders() -> list[dict]:
     """Validate and serialize all PO records."""
     return [po.model_dump(mode="json") for po in PURCHASE_ORDERS]
 
+def generate_shipments() -> list[dict]:
+    """Validate and serialize all Shipment records."""
+    return [s.model_dump(mode="json") for s in SHIPMENTS]
 
 def write_to_file(data: list[dict], filepath: Path) -> None:
     """Write records as pretty-printed JSON."""
@@ -92,18 +160,24 @@ def write_to_file(data: list[dict], filepath: Path) -> None:
 def main() -> None:
     print("Generating Purchase Orders...")
     po_data = generate_purchase_orders()
+    write_to_file(po_data, Path("mock_data/purchase_orders.json"))
 
-    output_path = Path("mock_data/purchase_orders.json")
-    write_to_file(po_data, output_path)
+    print("Generating Shipments...")
+    sh_data = generate_shipments()
+    write_to_file(sh_data, Path("mock_data/shipments.json"))
 
-    print("\n=== Purchase Orders Summary ===")
+    print("\n=== Summary ===")
     for po in PURCHASE_ORDERS:
         days_until_due = (po.required_delivery_date - date(2026, 7, 7)).days
         print(
-            f"  {po.po_id} | {po.material:<22} | {po.supplier:<16} "
-            f"| {po.priority.value:<8} | Due in {days_until_due:>2}d"
+            f"  {po.po_id} | {po.material:<22} | {po.priority.value:<8} | Due in {days_until_due:>2}d"
         )
-    print(f"\nTotal: {len(po_data)} purchase orders generated.")
+    print()
+    for sh in SHIPMENTS:
+        print(
+            f"  {sh.shipment_id} → {sh.po_id} | {sh.carrier:<16} | {sh.mode.value:<6} | {sh.status.value}"
+        )
+    print(f"\nTotal: {len(po_data)} POs, {len(sh_data)} shipments.")
 
 
 if __name__ == "__main__":

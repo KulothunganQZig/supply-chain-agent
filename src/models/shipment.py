@@ -1,9 +1,13 @@
-"""Shipment, milestone, and GPS tracking models."""
+"""Shipment domain models — SQLAlchemy table + Pydantic schema."""
 
 from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
+from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.db import Base
 
 
 class TransportMode(str, Enum):
@@ -18,8 +22,36 @@ class ShipmentStatus(str, Enum):
     IN_TRANSIT = "in_transit"
     DELAYED = "delayed"
     DELIVERED = "delivered"
-    CANCELLED = "cancelled"
 
+
+# ---------------------------------------------------------------------------
+# SQLAlchemy ORM model
+# ---------------------------------------------------------------------------
+
+class ShipmentTable(Base):
+    __tablename__ = "shipments"
+
+    shipment_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    po_id: Mapped[str] = mapped_column(String(20), ForeignKey("purchase_orders.po_id"))
+    carrier: Mapped[str] = mapped_column(String(100))
+    mode: Mapped[str] = mapped_column(String(20))
+    origin: Mapped[str] = mapped_column(String(100))
+    destination: Mapped[str] = mapped_column(String(100))
+    planned_departure: Mapped[datetime] = mapped_column(DateTime)
+    planned_arrival: Mapped[datetime] = mapped_column(DateTime)
+    current_location: Mapped[str] = mapped_column(String(200), default="")
+    status: Mapped[str] = mapped_column(String(20), default="planned")
+
+    def __repr__(self) -> str:
+        return (
+            f"<Shipment(id={self.shipment_id!r}, po={self.po_id!r}, "
+            f"carrier={self.carrier!r}, status={self.status!r})>"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Pydantic schema
+# ---------------------------------------------------------------------------
 
 class Shipment(BaseModel):
     shipment_id: str
@@ -33,25 +65,4 @@ class Shipment(BaseModel):
     current_location: str = ""
     status: ShipmentStatus = ShipmentStatus.PLANNED
 
-
-class MilestoneStatus(str, Enum):
-    COMPLETED = "completed"
-    PENDING = "pending"
-    DELAYED = "delayed"
-    SKIPPED = "skipped"
-
-
-class Milestone(BaseModel):
-    shipment_id: str
-    milestone: str = Field(description="e.g. 'picked_up', 'customs_cleared', 'departed_port'")
-    timestamp: datetime
-    status: MilestoneStatus
-
-
-class GPSReading(BaseModel):
-    shipment_id: str
-    timestamp: datetime
-    latitude: float
-    longitude: float
-    speed_kmh: float
-    delay_indicator: bool = False
+    model_config = {"from_attributes": True}
