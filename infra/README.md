@@ -8,9 +8,25 @@ granted by RBAC role assignment instead.
 
 ## Prerequisites
 
-- **Azure CLI** — not currently installed on this machine. Install:
-  `winget install -e --id Microsoft.AzureCLI` (then reopen the shell).
+- **Azure CLI** — installed here **without admin rights** via pip into a
+  dedicated venv (the standard MSI/winget install needs admin):
+
+  ```powershell
+  # one-time, using the project's real Python:
+  .\.venv\Scripts\python.exe -m venv "$env:USERPROFILE\azcli-venv"
+  & "$env:USERPROFILE\azcli-venv\Scripts\python.exe" -m pip install azure-cli
+  # add to user PATH (no admin); open a NEW terminal afterwards for plain `az`:
+  # (already done on this machine — az.bat lives in %USERPROFILE%\azcli-venv\Scripts)
+  az bicep install    # installs the Bicep CLI to %USERPROFILE%\.azure\bin
+  ```
+
+  Installed version: azure-cli 2.88.0, bicep 0.44.1.
+  If `az` isn't found, either open a new terminal (PATH refresh) or call
+  `%USERPROFILE%\azcli-venv\Scripts\az.bat` directly.
 - An Azure subscription with quota for Azure OpenAI + the GPT-4.1 model.
+- **No admin?** If the pip route ever fails, Azure Cloud Shell
+  (`shell.azure.com`) has `az` + `bicep` preinstalled in-browser — upload
+  `infra/` and run the same commands.
 
 ## Steps
 
