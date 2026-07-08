@@ -40,7 +40,6 @@ def has_escalation_actions(message: MitigationPlan) -> bool:
 
 def build_workflow():
     """Construct the supply chain agent workflow."""
-
     ingestion = IngestionExecutor(id="ingestion")
     risk_detection = RiskDetectionExecutor(id="risk_detection")
     impact_analysis = ImpactAnalysisExecutor(id="impact_analysis")
