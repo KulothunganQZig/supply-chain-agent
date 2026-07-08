@@ -1,0 +1,24 @@
+# Virtualenvs / local tooling
+.venv/
+azcli-venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local secrets & state — never bake into the image
+.env
+*.db
+*.sqlite
+
+# VCS / docs / editor
+.git/
+.gitignore
+*.md
+infra/
+tests/
+agentic_supply_chain_engineering_challenge.docx
+
+# Generated mock JSON (regenerated at build time)
+mock_data/*.json
