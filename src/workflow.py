@@ -12,10 +12,10 @@ from typing_extensions import Never
 from agent_framework import Executor, WorkflowBuilder, WorkflowContext, handler
 
 from src.executors.ingestion import IngestionExecutor
+from src.executors.risk_detection import RiskDetectionExecutor
 from src.state import (
     ActionReport,
     ImpactReport,
-    IngestedData,
     MitigationPlan,
     RiskAssessment,
 )
@@ -28,14 +28,6 @@ logger = logging.getLogger("supply_chain_agent.workflow")
 # ---------------------------------------------------------------------------
 # Stub executors (Phase 2: these will get real logic)
 # ---------------------------------------------------------------------------
-
-class RiskDetectionExecutor(Executor):
-    @handler
-    async def process(self, message: IngestedData, ctx: WorkflowContext[RiskAssessment]) -> None:
-        logger.info(f"Risk detection: analyzing {len(message.shipments)} shipments...")
-        # TODO Phase 2: implement real risk detection
-        await ctx.send_message(RiskAssessment(alerts=[], ingested_data=message))
-
 
 class ImpactAnalysisExecutor(Executor):
     @handler

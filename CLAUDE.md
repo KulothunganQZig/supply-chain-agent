@@ -1,0 +1,111 @@
+# Supply Chain Visibility Agent
+
+## What this project is
+An agentic AI system that detects supply chain risks and autonomously executes or escalates mitigation actions. Built on Microsoft Agent Framework 1.0, targeting Azure AI Foundry Agent Service deployment.
+
+## Architecture
+6-executor WorkflowBuilder pipeline:
+```
+Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous Action / Human Approval
+```
+
+## Current state (Phase 1 complete, Phase 2 in progress)
+- **DONE**: All 7 mock data tables (POs, Shipments, Inventory, Sales Orders, Milestones, GPS, Emails) with Pydantic + SQLAlchemy models, JSON generation, and SQLite seeding
+- **DONE**: IngestionExecutor reads live from SQLite and assembles IngestedData
+- **DONE**: RiskDetectionExecutor scores each shipment across 4 weighted signals (milestone delay, GPS stall, email signal, ETA deviation) and emits RiskAlerts; unit-tested in `tests/test_executors/test_risk_detection.py`
+- **DONE**: Full workflow runs end-to-end across 4 supersteps (verified) — currently surfaces 3 alerts (SH-3001 high, SH-3005 high, SH-3003 medium)
+- **NEXT**: Implement ImpactAnalysisExecutor with real logic (stockout risk via inventory days-of-supply, production stoppage risk, revenue impact) — needs IngestionExecutor extended to also fetch inventory/sales orders/POs, which it doesn't yet
+- **THEN**: MitigationExecutor, terminal executors (AutonomousAction / HumanApproval)
+
+## Key files
+- `src/workflow.py` — WorkflowBuilder graph + remaining stub executor classes (3-6)
+- `src/executors/ingestion.py` — Live SQLite reads, fully implemented
+- `src/executors/risk_detection.py` — Risk scoring across 4 signals, fully implemented
+- `src/state.py` — Pydantic message schemas between executors
+- `src/models/` — SQLAlchemy tables + Pydantic schemas (erp.py, shipment.py, inventory.py, sales_order.py, milestone.py, gps.py, email.py)
+- `src/db.py` — Async SQLAlchemy engine + session factory
+- `src/config.py` — Settings with risk scoring weights and thresholds
+- `mock_data/generate.py` — Curated dataset with deliberate anomalies
+- `mock_data/seed_db.py` — Seeds all 7 tables into SQLite
+
+## Tech stack
+- Python 3.14, Microsoft Agent Framework 1.0 (`agent-framework` PyPI package)
+- SQLAlchemy 2.0 async + aiosqlite (local) / aioodbc (Azure SQL)
+- Pydantic v2 for validation
+- Azure OpenAI GPT-4.1 (Phase 2, for LLM-based reasoning in executors)
+
+## Risk signals embedded in mock data
+| Signal | Shipments | Detail |
+|---|---|---|
+| Milestone delays | SH-3001, SH-3005 | customs_cleared stuck |
+| GPS stalls | SH-3003, SH-3005 | speed=0 for 36+ hours |
+| Carrier emails | SH-3001, SH-3005 | +5d and +4d delay notices |
+| Low inventory | Steel Coils (1.9d), Battery Cells (3.0d), Carbon Fiber (2.4d) | Below safety stock |
+
+## Risk scoring weights (from src/config.py)
+- milestone_delay_weight: 0.35
+- gps_anomaly_weight: 0.25
+- email_signal_weight: 0.20
+- eta_deviation_weight: 0.20
+
+## Decision thresholds (from src/config.py)
+- confidence_threshold: 0.85 (above = auto-execute, below = escalate)
+- cost_escalation_threshold: 50000 (above = escalate regardless)
+- days_of_supply_critical: 3 (below = stockout risk)
+- risk_severity_critical/high/medium: 0.75 / 0.50 / 0.25 (risk_score buckets, else "low")
+
+## Microsoft Agent Framework API patterns
+```python
+# Executor with handler
+class MyExecutor(Executor):
+    @handler
+    async def process(self, message: InputType, ctx: WorkflowContext[OutputType]) -> None:
+        await ctx.send_message(result)  # forward to next executor
+
+# Terminal executor (workflow output)
+class FinalExecutor(Executor):
+    @handler
+    async def process(self, message: InputType, ctx: WorkflowContext[Never, OutputType]) -> None:
+        await ctx.yield_output(result)  # emit as workflow output
+
+# WorkflowBuilder
+workflow = (
+    WorkflowBuilder(start_executor=first_executor)
+    .add_edge(first, second)
+    .add_edge(second, third, condition=my_condition)
+    .build()
+)
+
+# Running
+result = await workflow.run("trigger")
+outputs = result.get_outputs()
+```
+
+## Shipment-to-PO mapping
+- SH-3001 → PO-1001 (Steel Coils, Tata Steel → Plant-Detroit, CRITICAL, Maersk ocean, DELAYED)
+- SH-3002 → PO-1002 (Polymer Resin, BASF → Plant-Chicago, MEDIUM, DB Schenker rail, IN_TRANSIT)
+- SH-3003 → PO-1003 (Battery Cells, Samsung SDI → Plant-Houston, HIGH, DHL ocean, IN_TRANSIT)
+- SH-3004 → PO-1004 (Adhesive Compound, Dow → Plant-Chicago, LOW, FedEx truck, IN_TRANSIT)
+- SH-3005 → PO-1005 (Carbon Fiber Sheets, Sinopec → Plant-Munich, CRITICAL, Kuehne+Nagel ocean, IN_TRANSIT)
+
+## Sales Orders at risk
+- SO-2001: AutoCorp needs Steel Coils by Jul 18 (CRITICAL) — only 1.9d of supply
+- SO-2003: NextGen Motors needs Battery Cells by Jul 22 (HIGH) — only 3.0d of supply
+- SO-2005: Precision Mfg needs Carbon Fiber by Jul 28 (CRITICAL) — only 2.4d of supply
+- SO-2006: Atlas Industries needs Steel Coils by Jul 25 (HIGH) — shares the 1.9d supply
+
+## Commands
+```bash
+python -m mock_data.generate    # Generate JSON mock data
+python -m mock_data.seed_db     # Seed SQLite from JSON
+python -m src.main              # Run the full pipeline
+pytest tests/                   # Run tests
+```
+
+## Conventions
+- One executor per agent, stubs currently in src/workflow.py (move to src/executors/ as implemented)
+- Pydantic models for API/validation, SQLAlchemy models for DB — both in src/models/
+- Config-driven thresholds (never hardcode)
+- Full file replacements preferred over incremental edits
+- Commit after each working step
+- Database is SQLite locally (supply_chain.db), Azure SQL in production — same SQLAlchemy code

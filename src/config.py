@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     email_signal_weight: float = 0.20
     eta_deviation_weight: float = 0.20
 
+    # Risk severity bucket boundaries (risk_score >= threshold)
+    risk_severity_critical: float = 0.75
+    risk_severity_high: float = 0.50
+    risk_severity_medium: float = 0.25
+
     # Logging
     log_level: str = "INFO"
 
