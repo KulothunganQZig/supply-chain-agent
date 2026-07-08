@@ -12,6 +12,7 @@ from typing_extensions import Never
 from agent_framework import Executor, WorkflowContext, handler
 
 from src.db import async_session
+from src.email_parsing import parse_email_delay_signal
 from src.models.email import CarrierEmail, CarrierEmailTable
 from src.models.erp import PurchaseOrder, PurchaseOrderTable
 from src.models.gps import GPSReading, GPSReadingTable
@@ -79,14 +80,18 @@ class IngestionExecutor(Executor):
             )
             email_rows = result.scalars().all()
 
+        # Parse each email's free-text subject/body ourselves rather than trusting
+        # the pre-tagged delay_days_mentioned/reason columns — see email_parsing.py.
         email_summaries = []
         for row in email_rows:
+            signal = await parse_email_delay_signal(row.subject, row.body)
             email_summaries.append({
                 "email_id": row.email_id,
                 "shipment_id": row.shipment_id,
                 "subject": row.subject,
-                "delay_days_mentioned": row.delay_days_mentioned,
-                "reason": row.reason,
+                "delay_days_mentioned": signal.delay_days,
+                "reason": signal.reason,
+                "mentions_delay": signal.mentions_delay,
             })
         logger.info(f"  Fetched {len(email_summaries)} carrier emails")
 

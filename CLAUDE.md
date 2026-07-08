@@ -18,11 +18,16 @@ Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous A
 - **DONE**: AutonomousActionExecutor / HumanApprovalExecutor are real (not stubs) — they record simulated execution / pending-approval outcomes as the two terminal `ActionReport` outputs
 - **DONE**: Full workflow runs end-to-end across all 6 executors (verified) — 3 alerts → 6 mitigation actions (3 auto-executed notify_customer, 3 escalated switch_transport_mode/expedite_shipment) — both the autonomous and human-approval branches fire in the same run
 - **DONE**: Thin FastAPI wrapper (`src/api.py`) — `POST /run` executes the full pipeline and returns JSON; `GET /health`; Swagger docs at `/docs`
-- **NEXT** (per requirement-doc gap check): make email handling actually parse unstructured email body/subject — RiskDetectionExecutor currently reads pre-structured `delay_days_mentioned`/`reason` fields, which sidesteps the "combining structured and unstructured signals" evaluation criterion
+- **DONE**: `src/email_parsing.py` actually parses each carrier email's unstructured `subject`/`body` (LLM when Azure is configured, regex fallback otherwise — both verified to reproduce the mock corpus's intended delay/reason exactly) instead of trusting the pre-tagged `delay_days_mentioned`/`reason` DB columns; wired into `IngestionExecutor`. Closes the requirement doc's "combining structured and unstructured signals" gap.
+- **NEXT**: none currently queued — all 6 executors implemented, requirement-doc gap check items (FastAPI, unstructured email parsing) closed. Candidates for further work: Azure migration (see below), Bing-grounded cross-shipment/carrier intelligence (optional stretch goal), a real dashboard.
+
+## Azure migration plan (discussed, not yet started)
+Keep the deterministic WorkflowBuilder pipeline as the control plane; use Azure AI Foundry only for narrow LLM calls (already how `mitigation.py`/`email_parsing.py` are built) rather than re-platforming onto Foundry Agent Service's thread/tool model — GenAIOps best practice is to keep consequential/costly decisions (auto-execute vs. escalate) deterministic and auditable, and reserve full agentic tool-use for genuinely open-ended tasks (e.g. a future Bing-grounded carrier/port risk lookup). Phases: (1) Azure SQL + Foundry project + Managed Identity — `DATABASE_URL`/`AZURE_AI_PROJECT_ENDPOINT` swaps already supported by existing code; (2) containerize `src/api.py` → Azure Container Apps + a scheduled Container Apps Job/Functions Timer (the pipeline needs to run periodically, not just on-demand); (3) replace mock data sources with real feeds (Event Hubs for GPS, Graph API/Logic Apps for email); (4) App Insights via OpenTelemetry, CI/CD via GitHub Actions.
 
 ## Key files
 - `src/workflow.py` — WorkflowBuilder graph wiring all 6 executors (no stubs remain)
 - `src/executors/ingestion.py` — Live SQLite reads, fully implemented
+- `src/email_parsing.py` — Unstructured email body/subject parsing (LLM + regex fallback)
 - `src/executors/risk_detection.py` — Risk scoring across 4 signals, fully implemented
 - `src/executors/impact_analysis.py` — Stockout/stoppage/revenue impact, fully implemented
 - `src/executors/mitigation.py` — Action decision + auto/escalation routing + optional LLM reasoning, fully implemented
