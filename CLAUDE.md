@@ -22,7 +22,68 @@ Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous A
 - **NEXT**: none currently queued — all 6 executors implemented, requirement-doc gap check items (FastAPI, unstructured email parsing) closed. Candidates for further work: Azure migration (see below), Bing-grounded cross-shipment/carrier intelligence (optional stretch goal), a real dashboard.
 
 ## Azure migration plan (discussed, not yet started)
-Keep the deterministic WorkflowBuilder pipeline as the control plane; use Azure AI Foundry only for narrow LLM calls (already how `mitigation.py`/`email_parsing.py` are built) rather than re-platforming onto Foundry Agent Service's thread/tool model — GenAIOps best practice is to keep consequential/costly decisions (auto-execute vs. escalate) deterministic and auditable, and reserve full agentic tool-use for genuinely open-ended tasks (e.g. a future Bing-grounded carrier/port risk lookup). Phases: (1) Azure SQL + Foundry project + Managed Identity — `DATABASE_URL`/`AZURE_AI_PROJECT_ENDPOINT` swaps already supported by existing code; (2) containerize `src/api.py` → Azure Container Apps + a scheduled Container Apps Job/Functions Timer (the pipeline needs to run periodically, not just on-demand); (3) replace mock data sources with real feeds (Event Hubs for GPS, Graph API/Logic Apps for email); (4) App Insights via OpenTelemetry, CI/CD via GitHub Actions.
+
+Design principle: keep the deterministic WorkflowBuilder pipeline as the control
+plane; use Azure AI Foundry only for narrow LLM calls (already how
+`mitigation.py`/`email_parsing.py` are built) rather than re-platforming onto
+Foundry Agent Service's thread/tool model. GenAIOps best practice is to keep
+consequential/costly decisions (auto-execute vs. escalate) deterministic and
+auditable, and reserve full agentic tool-use for genuinely open-ended tasks
+(e.g. a future Bing-grounded carrier/port risk lookup — see stretch row below).
+
+### Services needed, mapped to what they replace
+
+| # | Azure service | Replaces (local dev) | Status |
+|---|---|---|---|
+| 1 | Azure AI Foundry project + GPT-4.1 (or GPT-4o) deployment | Deterministic-only fallback reasoning | **Code ready** — set `AZURE_AI_PROJECT_ENDPOINT` + `MODEL_DEPLOYMENT_NAME`, no code change needed |
+| 2 | Azure SQL Database | `supply_chain.db` (SQLite) | **Code ready** — swap `DATABASE_URL` to `mssql+aioodbc://...`; container image needs `msodbcsql18` + `unixodbc` installed (apt, not pip) since aioodbc wraps the system ODBC driver |
+| 3 | User-Assigned Managed Identity | n/a (local dev has no identity) | New — one identity, attached to both the Container App and its scheduled Job |
+| 4 | Azure Container Registry | n/a | New — needs a `Dockerfile` (not yet written) |
+| 5 | Azure Container Apps (environment + app) | `python -m src.api` / `uvicorn` on a laptop | New |
+| 6 | Azure Container Apps Job (cron) or Functions Timer trigger | Manual `POST /run` | New — the pipeline should run periodically, not only on demand |
+| 7 | Azure Key Vault | `.env` file | New, optional — only for whatever secret can't use Managed Identity (ideally nothing, see below) |
+| 8 | Log Analytics + Application Insights | Console logs (`RichHandler`) | New, optional but recommended — `agent_framework`'s `ChatTelemetryLayer` is OpenTelemetry-based already |
+| 9 | *(stretch)* Azure Event Hubs | Static `gps_readings` mock rows | Not started — `eventhub_connection_string`/`eventhub_name` already stubbed in `config.py`, unused |
+| 10 | *(stretch)* Azure AI Search | n/a today (email parsing is per-email extraction, not corpus search) | Not started — `azure_search_endpoint`/`azure_search_index_name` already stubbed in `config.py`, unused |
+| 11 | *(stretch)* Grounding with Bing Search (via Foundry Agent Service) | n/a | Not started — the one place a real Foundry *Agent* (tool-calling) belongs, per the A-vs-B discussion, for cross-shipment/carrier intelligence |
+| 12 | GitHub Actions + Entra ID federated credential (OIDC) | Manual `docker build`/`push` | New — avoids storing any long-lived Azure secret in GitHub |
+
+### Credentials / API keys to procure
+
+The mitigation and email-parsing LLM hooks are coded **exclusively against
+`DefaultAzureCredential`** (`azure.identity.aio`) — no API key parameter exists
+in that code path today. Sticking with that (recommended): in production, the
+honest answer is **zero long-lived API keys** — what you actually need to
+procure/configure instead is IAM role assignments for the Managed Identity:
+
+| Resource | What to set up | Secret? |
+|---|---|---|
+| Azure OpenAI / Foundry resource | Assign **Cognitive Services OpenAI User** role to the Managed Identity | No key |
+| Azure SQL | Set the Managed Identity as (or map it via) an Azure AD contained database user (`CREATE USER [identity-name] FROM EXTERNAL PROVIDER`) | No key |
+| Key Vault (if used) | Assign **Key Vault Secrets User** role to the Managed Identity | No key |
+
+Only the stretch items are genuinely key-based (nothing to do until those are built):
+
+| Resource | Key needed | Notes |
+|---|---|---|
+| Azure AI Search | Admin or query API key | AAD auth is supported on newer API versions too, but key-based is the simpler default |
+| Azure Event Hubs | Connection string (SAS key) | Matches the existing `eventhub_connection_string` config field as-is; AAD is a possible alternative |
+| Grounding with Bing Search | Its own resource + API key, procured via Azure Marketplace | Tied specifically to Foundry Agent Service tool use |
+
+**Local dev, outside Azure:** no key needed either — run `az login` once and
+`DefaultAzureCredential` picks up your personal Azure AD session, as long as
+you have the RBAC roles above on the dev resources. If per-developer RBAC
+setup is too much friction for quick local testing, the faster (less secure)
+alternative is to add an `api_key` fallback parameter to the two LLM hooks and
+paste a key from the Azure OpenAI resource's "Keys and Endpoint" page — that's
+a small, deliberate code change we haven't made, flagging it here rather than
+doing it silently.
+
+### Phased rollout
+1. Azure SQL + Foundry project + Managed Identity + RBAC role assignments above — no code changes beyond `.env` values.
+2. Write a `Dockerfile`, push to ACR, deploy `src/api.py` to Container Apps; add the scheduled Container Apps Job.
+3. Replace mock data sources with real feeds (Event Hubs for GPS, Graph API/Logic Apps for email) — new ingestion code required.
+4. App Insights via OpenTelemetry; CI/CD via GitHub Actions with OIDC (no `AZURE_CREDENTIALS` secret).
 
 ## Key files
 - `src/workflow.py` — WorkflowBuilder graph wiring all 6 executors (no stubs remain)
