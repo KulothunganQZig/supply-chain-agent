@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # This is the Azure OpenAI *resource* endpoint — https://<resource>.openai.azure.com/ —
     # NOT the Foundry project endpoint. Empty = LLM hooks use their deterministic fallback.
     azure_openai_endpoint: str = ""
-    azure_openai_api_version: str = "2024-10-21"
+    azure_openai_api_version: str = "2025-04-01-preview"
     model_deployment_name: str = "gpt-5-mini"
 
     # Azure AI Foundry project endpoint — https://<account>.services.ai.azure.com/api/projects/<project>.

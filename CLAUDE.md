@@ -19,10 +19,10 @@ Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous A
 - **DONE**: Full workflow runs end-to-end across all 6 executors (verified) — 3 alerts → 6 mitigation actions (3 auto-executed notify_customer, 3 escalated switch_transport_mode/expedite_shipment) — both the autonomous and human-approval branches fire in the same run
 - **DONE**: Thin FastAPI wrapper (`src/api.py`) — `POST /run` executes the full pipeline and returns JSON; `GET /health`; Swagger docs at `/docs`
 - **DONE**: `src/email_parsing.py` actually parses each carrier email's unstructured `subject`/`body` (LLM when Azure is configured, regex fallback otherwise — both verified to reproduce the mock corpus's intended delay/reason exactly) instead of trusting the pre-tagged `delay_days_mentioned`/`reason` DB columns; wired into `IngestionExecutor`. Closes the requirement doc's "combining structured and unstructured signals" gap.
-- **IN PROGRESS**: Azure migration Phase 1 (Azure OpenAI only). Code side done — LLM client centralized in `src/llm.py`, endpoint-format bug fixed (uses OpenAI resource endpoint, not Foundry project endpoint), keyless AAD auth. Bicep provisioning authored in `infra/` (`main.bicep` + `main.bicepparam` + `README.md`). **Blocked on user**: az CLI not installed on this machine, and provisioning needs the user's subscription — user runs `infra/README.md` steps, then sets `AZURE_OPENAI_ENDPOINT`/`MODEL_DEPLOYMENT_NAME` in `.env`. LLM path is still unverified against a live endpoint.
-- **NEXT**: after Phase 1 verified live — Azure SQL migration (Phase 1 remainder), then containerize + Container Apps (Phase 2). Candidates beyond migration: Bing-grounded cross-shipment/carrier intelligence (stretch), a real dashboard.
+- **DONE (verified live)**: Azure migration Phase 1 — Azure OpenAI provisioned via `infra/main.bicep` and the pipeline's LLM reasoning confirmed running against the real model. Deployed resource `oai-supplychain-vpv6suzb4aue6` (rg `rg-supplychain-agent`, eastus2), model `gpt-5-mini` (GlobalStandard), keyless AAD auth via the dev's `az login` + Cognitive Services OpenAI User role. `.env` (gitignored) holds the endpoint. `python -m src.main` now emits genuinely LLM-authored `reasoning` strings, not the deterministic fallback. Gotchas hit + resolved: (1) az CLI installed **without admin** via pip into a dedicated venv (`~/azcli-venv`); (2) `gpt-4.1`/`gpt-4.1-mini`/`gpt-4o-mini` are all in a deprecating state (blocked for new deployments) → switched to `gpt-5-mini`; (3) `gpt-5-mini` needs the `GlobalStandard` SKU (no regional Standard); (4) gpt-5 models need a **2025+ api-version** (`2024-10-21` → 404, `2025-04-01-preview` works).
+- **NEXT**: Azure SQL migration (Phase 1 remainder), then containerize + Container Apps (Phase 2). Candidates beyond migration: Bing-grounded cross-shipment/carrier intelligence (stretch), a real dashboard.
 
-## Azure migration plan (Phase 1 in progress — Azure OpenAI)
+## Azure migration plan (Phase 1 Azure OpenAI DONE — SQL + hosting next)
 
 Design principle: keep the deterministic WorkflowBuilder pipeline as the control
 plane; use Azure AI Foundry only for narrow LLM calls (already how
@@ -36,7 +36,7 @@ auditable, and reserve full agentic tool-use for genuinely open-ended tasks
 
 | # | Azure service | Replaces (local dev) | Status |
 |---|---|---|---|
-| 1 | Azure OpenAI resource + GPT-4.1 deployment | Deterministic-only fallback reasoning | **Provisioning ready** — Bicep in `infra/`; set `AZURE_OPENAI_ENDPOINT` + `MODEL_DEPLOYMENT_NAME` from its outputs, no code change. (Endpoint-format bug fixed: LLM hooks now use the OpenAI *resource* endpoint via `src/llm.py`, not the Foundry project endpoint.) |
+| 1 | Azure OpenAI resource + gpt-5-mini deployment | Deterministic-only fallback reasoning | **DONE, verified live** — deployed via Bicep (`infra/`), `.env` set, LLM reasoning confirmed against the real model. Keyless AAD (no key). |
 | 2 | Azure SQL Database | `supply_chain.db` (SQLite) | **Code ready** — swap `DATABASE_URL` to `mssql+aioodbc://...`; container image needs `msodbcsql18` + `unixodbc` installed (apt, not pip) since aioodbc wraps the system ODBC driver |
 | 3 | User-Assigned Managed Identity | n/a (local dev has no identity) | New — one identity, attached to both the Container App and its scheduled Job |
 | 4 | Azure Container Registry | n/a | New — needs a `Dockerfile` (not yet written) |
