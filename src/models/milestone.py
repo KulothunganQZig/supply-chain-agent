@@ -1,7 +1,7 @@
 """Milestone domain models — SQLAlchemy table + Pydantic schema."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 from sqlalchemy import DateTime, ForeignKey, Integer, String
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.db import Base
 
 
-class MilestoneStatus(str, Enum):
+class MilestoneStatus(StrEnum):
     COMPLETED = "completed"
     PENDING = "pending"
     DELAYED = "delayed"

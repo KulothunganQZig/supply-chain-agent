@@ -8,13 +8,13 @@ import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from src.models.erp import Priority, PurchaseOrder
-from src.models.shipment import Shipment, ShipmentStatus, TransportMode
-from src.models.inventory import Inventory
-from src.models.sales_order import SalesOrder
-from src.models.milestone import Milestone, MilestoneStatus
-from src.models.gps import GPSReading
 from src.models.email import CarrierEmail
+from src.models.erp import Priority, PurchaseOrder
+from src.models.gps import GPSReading
+from src.models.inventory import Inventory
+from src.models.milestone import Milestone, MilestoneStatus
+from src.models.sales_order import SalesOrder
+from src.models.shipment import Shipment, ShipmentStatus, TransportMode
 
 # ---------------------------------------------------------------------------
 # Purchase Orders
@@ -599,7 +599,10 @@ def main() -> None:
     print("\n=== Inventory ===")
     for inv in INVENTORY:
         flag = " ⚠ LOW" if inv.below_safety_stock else ""
-        print(f"  {inv.plant:<16} | {inv.material:<22} | stock={inv.current_stock:>5} | dos={inv.days_of_supply:>5}d{flag}")
+        print(
+            f"  {inv.plant:<16} | {inv.material:<22} | "
+            f"stock={inv.current_stock:>5} | dos={inv.days_of_supply:>5}d{flag}"
+        )
 
     print("\n=== Sales Orders ===")
     for so in SALES_ORDERS:
@@ -613,7 +616,8 @@ def main() -> None:
 
     print("\n=== GPS Readings ===")
     stalls = [g for g in GPS_READINGS if g.delay_indicator]
-    print(f"  Total: {len(GPS_READINGS)} readings, Stalls: {len(stalls)} ({', '.join(set(g.shipment_id for g in stalls))})")
+    stall_ids = ", ".join({g.shipment_id for g in stalls})
+    print(f"  Total: {len(GPS_READINGS)} readings, Stalls: {len(stalls)} ({stall_ids})")
 
     print("\n=== Carrier Emails ===")
     for e in CARRIER_EMAILS:

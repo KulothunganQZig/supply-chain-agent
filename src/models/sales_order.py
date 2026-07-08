@@ -1,7 +1,6 @@
 """Sales Order domain models — SQLAlchemy table + Pydantic schema."""
 
 from datetime import date
-from enum import Enum
 
 from pydantic import BaseModel, Field
 from sqlalchemy import Date, Integer, String
@@ -9,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db import Base
 from src.models.erp import Priority
-
 
 # ---------------------------------------------------------------------------
 # SQLAlchemy ORM model

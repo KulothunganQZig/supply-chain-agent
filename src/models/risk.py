@@ -1,19 +1,19 @@
 """Risk assessment and alert models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class RiskSeverity(str, Enum):
+class RiskSeverity(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
-class RiskSource(str, Enum):
+class RiskSource(StrEnum):
     MILESTONE_DELAY = "milestone_delay"
     GPS_ANOMALY = "gps_anomaly"
     EMAIL_SIGNAL = "email_signal"

@@ -7,8 +7,7 @@ prototype has no real carrier/CRM integration to call.
 """
 
 import logging
-
-from typing_extensions import Never
+from typing import Never
 
 from agent_framework import Executor, WorkflowContext, handler
 

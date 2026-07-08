@@ -6,14 +6,12 @@ and assembles into an IngestedData message for the risk detection executor.
 
 import logging
 
-from sqlalchemy import select
-from typing_extensions import Never
-
 from agent_framework import Executor, WorkflowContext, handler
+from sqlalchemy import select
 
 from src.db import async_session
 from src.email_parsing import parse_email_delay_signal
-from src.models.email import CarrierEmail, CarrierEmailTable
+from src.models.email import CarrierEmailTable
 from src.models.erp import PurchaseOrder, PurchaseOrderTable
 from src.models.gps import GPSReading, GPSReadingTable
 from src.models.inventory import Inventory, InventoryTable

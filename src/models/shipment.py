@@ -1,23 +1,23 @@
 """Shipment domain models — SQLAlchemy table + Pydantic schema."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db import Base
 
 
-class TransportMode(str, Enum):
+class TransportMode(StrEnum):
     TRUCK = "truck"
     RAIL = "rail"
     OCEAN = "ocean"
     AIR = "air"
 
 
-class ShipmentStatus(str, Enum):
+class ShipmentStatus(StrEnum):
     PLANNED = "planned"
     IN_TRANSIT = "in_transit"
     DELAYED = "delayed"

@@ -6,8 +6,7 @@ impact is high" rule, applied via src/config.py's decision thresholds.
 """
 
 import logging
-
-from typing_extensions import Never
+from typing import Never
 
 from agent_framework import Executor, WorkflowContext, handler
 

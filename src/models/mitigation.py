@@ -1,12 +1,12 @@
 """Mitigation action and decision models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     EXPEDITE_SHIPMENT = "expedite_shipment"
     REROUTE_SHIPMENT = "reroute_shipment"
     SWITCH_TRANSPORT_MODE = "switch_transport_mode"
@@ -28,7 +28,7 @@ class MitigationAction(BaseModel):
     reasoning: str = Field(description="LLM reasoning chain for this recommendation")
 
 
-class ActionOutcome(str, Enum):
+class ActionOutcome(StrEnum):
     EXECUTED_AUTO = "executed_automatically"
     APPROVED_HUMAN = "approved_by_human"
     REJECTED_HUMAN = "rejected_by_human"

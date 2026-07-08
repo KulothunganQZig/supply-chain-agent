@@ -192,9 +192,16 @@ events into JSON:
 ## Conventions
 - One executor per agent — all 6 now real, in `src/executors/` (no stubs remain in `src/workflow.py`)
 - Pydantic models for API/validation, SQLAlchemy models for DB — both in src/models/
+- Enums are `StrEnum` (not `(str, Enum)`) — always accessed via `.value` at DB/serialization boundaries
 - Config-driven thresholds (never hardcode); heuristic proxies with no real backing data
   (revenue-per-unit, mitigation action costs) are documented module constants, not settings
 - Full file replacements preferred over incremental edits
 - Commit after each working step
 - Database is SQLite locally (supply_chain.db), Azure SQL in production — same SQLAlchemy code
 - Shared CLI/API startup (`.env` load + logging) lives in `src/bootstrap.py`
+- Lint: `ruff check src/ tests/ mock_data/` must pass clean (config in pyproject.toml)
+- Tests are wall-clock-deterministic: `risk_detection._current_time()` is the "now" seam,
+  pinned by an autouse fixture in `tests/conftest.py` to 2026-07-07 (the mock dataset's anchor
+  date). Production keeps real `datetime.utcnow()`. Don't reintroduce direct `utcnow()` calls in
+  risk logic — route through the seam so time-boundary cases (e.g. SH-3003's stall vs. supply)
+  stay deterministic.

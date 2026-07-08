@@ -13,7 +13,7 @@ from mock_data.generate import (
 )
 from src.executors.impact_analysis import ImpactAnalysisExecutor
 from src.executors.risk_detection import RiskDetectionExecutor
-from src.state import IngestedData, ImpactReport, RiskAssessment
+from src.state import ImpactReport, IngestedData, RiskAssessment
 
 
 class _CapturingContext:

@@ -9,7 +9,7 @@ following the same pattern.
 """
 
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 from sqlalchemy import Date, Integer, String
@@ -17,12 +17,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db import Base
 
-
 # ---------------------------------------------------------------------------
 # Enums (shared between SQLAlchemy and Pydantic)
 # ---------------------------------------------------------------------------
 
-class Priority(str, Enum):
+class Priority(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"

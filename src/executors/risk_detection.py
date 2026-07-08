@@ -27,6 +27,16 @@ _GPS_STALL_SATURATION_HOURS = 48.0
 _EMAIL_DELAY_SATURATION_DAYS = 7.0
 
 
+def _current_time() -> datetime:
+    """Analysis reference time ('now').
+
+    Production uses real wall-clock — a live risk engine must measure how long a
+    milestone/GPS stall has actually persisted. This is a seam so tests can pin a
+    fixed reference (the mock dataset uses fixed timestamps; see tests/conftest.py).
+    """
+    return datetime.utcnow()
+
+
 def _milestone_delay_signal(milestones: list[Milestone], now: datetime) -> tuple[float, float]:
     """Sub-score + estimated delay (days) from milestones stuck in DELAYED status."""
     delayed = [m for m in milestones if m.status == MilestoneStatus.DELAYED]
@@ -77,7 +87,7 @@ class RiskDetectionExecutor(Executor):
     @handler
     async def process(self, message: IngestedData, ctx: WorkflowContext[RiskAssessment]) -> None:
         logger.info(f"Risk detection: analyzing {len(message.shipments)} shipments...")
-        now = datetime.utcnow()
+        now = _current_time()
 
         milestones_by_shipment: dict[str, list[Milestone]] = defaultdict(list)
         for m in message.milestones:

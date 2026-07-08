@@ -7,6 +7,8 @@
                                   Autonomous Action      Human Approval
 """
 
+import logging
+
 from agent_framework import WorkflowBuilder
 
 from src.executors.autonomous_action import AutonomousActionExecutor
@@ -16,8 +18,6 @@ from src.executors.ingestion import IngestionExecutor
 from src.executors.mitigation import MitigationExecutor
 from src.executors.risk_detection import RiskDetectionExecutor
 from src.state import MitigationPlan
-
-import logging
 
 logger = logging.getLogger("supply_chain_agent.workflow")
 

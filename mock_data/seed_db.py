@@ -11,13 +11,13 @@ from pathlib import Path
 from sqlalchemy import select
 
 from src.db import async_session, create_tables
-from src.models.erp import PurchaseOrder, PurchaseOrderTable
-from src.models.shipment import Shipment, ShipmentTable
-from src.models.inventory import Inventory, InventoryTable
-from src.models.sales_order import SalesOrder, SalesOrderTable
-from src.models.milestone import Milestone, MilestoneTable
-from src.models.gps import GPSReading, GPSReadingTable
 from src.models.email import CarrierEmail, CarrierEmailTable
+from src.models.erp import PurchaseOrder, PurchaseOrderTable
+from src.models.gps import GPSReading, GPSReadingTable
+from src.models.inventory import Inventory, InventoryTable
+from src.models.milestone import Milestone, MilestoneTable
+from src.models.sales_order import SalesOrder, SalesOrderTable
+from src.models.shipment import Shipment, ShipmentTable
 
 
 async def seed_table(
