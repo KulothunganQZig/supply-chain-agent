@@ -6,9 +6,17 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Central configuration for the supply chain agent system."""
 
-    # Azure AI Foundry
-    azure_ai_project_endpoint: str = ""
+    # Azure OpenAI (LLM reasoning + email parsing).
+    # This is the Azure OpenAI *resource* endpoint — https://<resource>.openai.azure.com/ —
+    # NOT the Foundry project endpoint. Empty = LLM hooks use their deterministic fallback.
+    azure_openai_endpoint: str = ""
+    azure_openai_api_version: str = "2024-10-21"
     model_deployment_name: str = "gpt-4.1"
+
+    # Azure AI Foundry project endpoint — https://<account>.services.ai.azure.com/api/projects/<project>.
+    # Reserved for future Foundry Agent Service tool-use (cross-shipment intelligence); NOT used by
+    # the current narrow-completion LLM hooks, which go through azure_openai_endpoint above.
+    azure_ai_project_endpoint: str = ""
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./supply_chain.db"

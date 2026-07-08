@@ -9,11 +9,11 @@ them; that would mean the pipeline never actually reads the unstructured
 `subject`/`body` fields it claims to ingest. This module is what actually
 reads that free text.
 
-Uses an LLM (Azure OpenAI, when AZURE_AI_PROJECT_ENDPOINT is configured) for
-robust extraction over arbitrary phrasing; falls back to a regex-based
-extractor over the same raw text otherwise, so behavior is identical with or
-without Azure configured — no .env exists locally, so the regex path is what
-actually runs today.
+Uses an LLM (Azure OpenAI, when AZURE_OPENAI_ENDPOINT is configured, via
+src/llm.py) for robust extraction over arbitrary phrasing; falls back to a
+regex-based extractor over the same raw text otherwise, so behavior is identical
+with or without Azure configured — no .env exists locally, so the regex path is
+what actually runs today.
 """
 
 import json
@@ -22,7 +22,7 @@ import re
 
 from pydantic import BaseModel
 
-from src.config import settings
+from src.llm import complete as llm_complete
 
 logger = logging.getLogger("supply_chain_agent.email_parsing")
 
@@ -60,34 +60,20 @@ def _regex_extract(subject: str, body: str) -> EmailDelaySignal:
 
 async def _llm_extract(subject: str, body: str) -> EmailDelaySignal | None:
     """Best-effort LLM extraction. Returns None on any failure so the caller falls back."""
-    if not settings.azure_ai_project_endpoint:
+    prompt = (
+        "Extract shipment delay information from this carrier email. "
+        "Respond with ONLY a JSON object, no other text: "
+        '{"mentions_delay": <bool>, "delay_days": <number>, "reason": "<short phrase>"}\n\n'
+        f"Subject: {subject}\n\nBody:\n{body}"
+    )
+    raw = await llm_complete(prompt)
+    if raw is None:
         return None
     try:
-        from agent_framework import Message
-        from agent_framework_openai import OpenAIChatClient
-        from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
-        from openai import AsyncAzureOpenAI
-
-        prompt = (
-            "Extract shipment delay information from this carrier email. "
-            "Respond with ONLY a JSON object, no other text: "
-            '{"mentions_delay": <bool>, "delay_days": <number>, "reason": "<short phrase>"}\n\n'
-            f"Subject: {subject}\n\nBody:\n{body}"
-        )
-        async with DefaultAzureCredential() as credential:
-            token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-            azure_client = AsyncAzureOpenAI(
-                azure_endpoint=settings.azure_ai_project_endpoint,
-                azure_deployment=settings.model_deployment_name,
-                api_version="2024-10-21",
-                azure_ad_token_provider=token_provider,
-            )
-            chat_client = OpenAIChatClient(async_client=azure_client)
-            response = await chat_client.get_response([Message("user", [prompt])])
-            raw = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-            return EmailDelaySignal.model_validate(json.loads(raw))
-    except Exception:
-        logger.warning("LLM email extraction unavailable, falling back to regex parsing", exc_info=True)
+        cleaned = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        return EmailDelaySignal.model_validate(json.loads(cleaned))
+    except (json.JSONDecodeError, ValueError):
+        logger.warning("Could not parse LLM email-extraction JSON, falling back to regex", exc_info=True)
         return None
 
 

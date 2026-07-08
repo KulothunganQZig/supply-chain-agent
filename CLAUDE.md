@@ -14,14 +14,15 @@ Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous A
 - **DONE**: IngestionExecutor reads live from SQLite — shipments/milestones/GPS/emails plus purchase orders, inventory, and sales orders scoped to the materials those POs carry
 - **DONE**: RiskDetectionExecutor scores each shipment across 4 weighted signals (milestone delay, GPS stall, email signal, ETA deviation) and emits RiskAlerts; unit-tested in `tests/test_executors/test_risk_detection.py`
 - **DONE**: ImpactAnalysisExecutor joins each alert to its PO/plant/inventory and to sales orders sharing the same material, then flags stockout risk (below safety stock or days-of-supply ≤ critical threshold) and production stoppage risk (delay ≥ remaining days of supply), plus a rough revenue-at-risk figure (quantity × priority-tier $/unit proxy — no real price data in the mock set); unit-tested in `tests/test_executors/test_impact_analysis.py`
-- **DONE**: MitigationExecutor decides a primary action per alert (switch_transport_mode / expedite_shipment / notify_carrier by a deterministic decision tree) plus a notify_customer companion when sales orders are affected, then routes every action to auto vs. escalation via `confidence_threshold` / `cost_escalation_threshold`. The `reasoning` field is LLM-generated (Azure OpenAI via `agent_framework_openai.OpenAIChatClient` + AAD auth) when `AZURE_AI_PROJECT_ENDPOINT` is set — this is the first executor wired to call the LLM — and falls back to a deterministic explanation otherwise (any LLM failure is caught, so behavior is identical with or without Azure configured); unit-tested in `tests/test_executors/test_mitigation.py` (LLM path untested locally since no `.env` credentials exist)
+- **DONE**: MitigationExecutor decides a primary action per alert (switch_transport_mode / expedite_shipment / notify_carrier by a deterministic decision tree) plus a notify_customer companion when sales orders are affected, then routes every action to auto vs. escalation via `confidence_threshold` / `cost_escalation_threshold`. The `reasoning` field is LLM-generated (Azure OpenAI via shared `src/llm.py`) when `AZURE_OPENAI_ENDPOINT` is set — and falls back to a deterministic explanation otherwise (any LLM failure is caught, so behavior is identical with or without Azure configured); unit-tested in `tests/test_executors/test_mitigation.py` (LLM path untested locally since no `.env` credentials exist)
 - **DONE**: AutonomousActionExecutor / HumanApprovalExecutor are real (not stubs) — they record simulated execution / pending-approval outcomes as the two terminal `ActionReport` outputs
 - **DONE**: Full workflow runs end-to-end across all 6 executors (verified) — 3 alerts → 6 mitigation actions (3 auto-executed notify_customer, 3 escalated switch_transport_mode/expedite_shipment) — both the autonomous and human-approval branches fire in the same run
 - **DONE**: Thin FastAPI wrapper (`src/api.py`) — `POST /run` executes the full pipeline and returns JSON; `GET /health`; Swagger docs at `/docs`
 - **DONE**: `src/email_parsing.py` actually parses each carrier email's unstructured `subject`/`body` (LLM when Azure is configured, regex fallback otherwise — both verified to reproduce the mock corpus's intended delay/reason exactly) instead of trusting the pre-tagged `delay_days_mentioned`/`reason` DB columns; wired into `IngestionExecutor`. Closes the requirement doc's "combining structured and unstructured signals" gap.
-- **NEXT**: none currently queued — all 6 executors implemented, requirement-doc gap check items (FastAPI, unstructured email parsing) closed. Candidates for further work: Azure migration (see below), Bing-grounded cross-shipment/carrier intelligence (optional stretch goal), a real dashboard.
+- **IN PROGRESS**: Azure migration Phase 1 (Azure OpenAI only). Code side done — LLM client centralized in `src/llm.py`, endpoint-format bug fixed (uses OpenAI resource endpoint, not Foundry project endpoint), keyless AAD auth. Bicep provisioning authored in `infra/` (`main.bicep` + `main.bicepparam` + `README.md`). **Blocked on user**: az CLI not installed on this machine, and provisioning needs the user's subscription — user runs `infra/README.md` steps, then sets `AZURE_OPENAI_ENDPOINT`/`MODEL_DEPLOYMENT_NAME` in `.env`. LLM path is still unverified against a live endpoint.
+- **NEXT**: after Phase 1 verified live — Azure SQL migration (Phase 1 remainder), then containerize + Container Apps (Phase 2). Candidates beyond migration: Bing-grounded cross-shipment/carrier intelligence (stretch), a real dashboard.
 
-## Azure migration plan (discussed, not yet started)
+## Azure migration plan (Phase 1 in progress — Azure OpenAI)
 
 Design principle: keep the deterministic WorkflowBuilder pipeline as the control
 plane; use Azure AI Foundry only for narrow LLM calls (already how
@@ -35,7 +36,7 @@ auditable, and reserve full agentic tool-use for genuinely open-ended tasks
 
 | # | Azure service | Replaces (local dev) | Status |
 |---|---|---|---|
-| 1 | Azure AI Foundry project + GPT-4.1 (or GPT-4o) deployment | Deterministic-only fallback reasoning | **Code ready** — set `AZURE_AI_PROJECT_ENDPOINT` + `MODEL_DEPLOYMENT_NAME`, no code change needed |
+| 1 | Azure OpenAI resource + GPT-4.1 deployment | Deterministic-only fallback reasoning | **Provisioning ready** — Bicep in `infra/`; set `AZURE_OPENAI_ENDPOINT` + `MODEL_DEPLOYMENT_NAME` from its outputs, no code change. (Endpoint-format bug fixed: LLM hooks now use the OpenAI *resource* endpoint via `src/llm.py`, not the Foundry project endpoint.) |
 | 2 | Azure SQL Database | `supply_chain.db` (SQLite) | **Code ready** — swap `DATABASE_URL` to `mssql+aioodbc://...`; container image needs `msodbcsql18` + `unixodbc` installed (apt, not pip) since aioodbc wraps the system ODBC driver |
 | 3 | User-Assigned Managed Identity | n/a (local dev has no identity) | New — one identity, attached to both the Container App and its scheduled Job |
 | 4 | Azure Container Registry | n/a | New — needs a `Dockerfile` (not yet written) |
@@ -94,6 +95,8 @@ doing it silently.
 - `src/executors/mitigation.py` — Action decision + auto/escalation routing + optional LLM reasoning, fully implemented
 - `src/executors/autonomous_action.py` — Simulated auto-execution, fully implemented
 - `src/executors/human_approval.py` — Escalation reporting, fully implemented
+- `src/llm.py` — Shared keyless Azure OpenAI chat client for the LLM hooks (mitigation + email parsing)
+- `infra/` — Bicep provisioning for Azure OpenAI (main.bicep, main.bicepparam, README.md)
 - `src/state.py` — Pydantic message schemas between executors
 - `src/models/` — SQLAlchemy tables + Pydantic schemas (erp.py, shipment.py, inventory.py, sales_order.py, milestone.py, gps.py, email.py)
 - `src/db.py` — Async SQLAlchemy engine + session factory
