@@ -151,6 +151,22 @@ async def seed_all() -> None:
     )
 
 
+async def seed_if_empty() -> None:
+    """Create tables and seed only if the DB is empty. Safe to call on every startup.
+
+    Used by the API's startup hook so the container populates a fresh Azure SQL
+    database on first boot (SQLite is already seeded into the image at build time).
+    """
+    await create_tables()
+    async with async_session() as session:
+        existing = await session.execute(select(ShipmentTable))
+        if existing.scalars().first() is not None:
+            print("Database already seeded — skipping.")
+            return
+    print("Empty database detected — seeding...")
+    await seed_all()
+
+
 def main() -> None:
     asyncio.run(seed_all())
 

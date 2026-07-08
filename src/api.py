@@ -10,6 +10,7 @@ Usage:
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -20,10 +21,26 @@ from src.workflow import build_workflow
 bootstrap()
 logger = logging.getLogger("supply_chain_agent.api")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure the schema exists and seed on first boot.
+
+    Baked-in SQLite is already seeded at build time, so this is effectively a
+    no-op there; on a fresh Azure SQL database it creates the tables and loads
+    the mock data (idempotent — skips if already populated).
+    """
+    from mock_data.seed_db import seed_if_empty
+
+    await seed_if_empty()
+    yield
+
+
 app = FastAPI(
     title="Supply Chain Visibility Agent",
     description="Detects supply chain risks and autonomously executes or escalates mitigation actions.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 

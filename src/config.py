@@ -18,8 +18,16 @@ class Settings(BaseSettings):
     # the current narrow-completion LLM hooks, which go through azure_openai_endpoint above.
     azure_ai_project_endpoint: str = ""
 
-    # Database
+    # Client ID of the user-assigned Managed Identity. Set on the Container App so
+    # DefaultAzureCredential (OpenAI) and the SQL ODBC driver (ActiveDirectoryMsi)
+    # both bind to the right identity. Empty locally.
+    azure_client_id: str = ""
+
+    # Database. Local dev = SQLite (default below). When azure_sql_server is set,
+    # db.py builds a keyless mssql+aioodbc URL (ActiveDirectoryMsi) instead — see db.py.
     database_url: str = "sqlite+aiosqlite:///./supply_chain.db"
+    azure_sql_server: str = ""    # e.g. sql-sc-xxxx.database.windows.net
+    azure_sql_database: str = ""  # e.g. scdb
 
     # Azure AI Search (empty = skip email search in local dev)
     azure_search_endpoint: str = ""
