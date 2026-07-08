@@ -16,13 +16,16 @@ param location string = resourceGroup().location
 param openAiName string = 'oai-supplychain-${uniqueString(resourceGroup().id)}'
 
 @description('Model deployment name — must match MODEL_DEPLOYMENT_NAME in the app config.')
-param modelDeploymentName string = 'gpt-4.1'
+param modelDeploymentName string = 'gpt-5-mini'
 
 @description('Underlying model to deploy.')
-param modelName string = 'gpt-4.1'
+param modelName string = 'gpt-5-mini'
 
-@description('Model version. Check availability in your region with: az cognitiveservices account list-models.')
-param modelVersion string = '2025-04-14'
+@description('Model version. Check availability/deprecation with: az cognitiveservices model list --location <loc>.')
+param modelVersion string = '2025-08-07'
+
+@description('Deployment SKU. gpt-5-mini offers GlobalStandard (not regional Standard). Verify per model+region.')
+param skuName string = 'GlobalStandard'
 
 @description('Tokens-per-minute capacity, in thousands (e.g. 30 = 30K TPM).')
 param modelCapacity int = 30
@@ -59,7 +62,7 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01
   parent: openAi
   name: modelDeploymentName
   sku: {
-    name: 'Standard'
+    name: skuName
     capacity: modelCapacity
   }
   properties: {

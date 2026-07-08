@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # NOT the Foundry project endpoint. Empty = LLM hooks use their deterministic fallback.
     azure_openai_endpoint: str = ""
     azure_openai_api_version: str = "2024-10-21"
-    model_deployment_name: str = "gpt-4.1"
+    model_deployment_name: str = "gpt-5-mini"
 
     # Azure AI Foundry project endpoint — https://<account>.services.ai.azure.com/api/projects/<project>.
     # Reserved for future Foundry Agent Service tool-use (cross-shipment intelligence); NOT used by

@@ -60,7 +60,7 @@ Copy `.env.example` to `.env` and set the two values from the deployment outputs
 
 ```
 AZURE_OPENAI_ENDPOINT=<azureOpenAIEndpoint output>   # https://<name>.openai.azure.com/
-MODEL_DEPLOYMENT_NAME=<modelDeploymentName output>   # gpt-4.1
+MODEL_DEPLOYMENT_NAME=<modelDeploymentName output>   # gpt-5-mini
 ```
 
 Then run the pipeline — the LLM path activates automatically (no code change):
@@ -77,9 +77,13 @@ to the identity's object ID.
 
 ## Notes / gotchas
 
-- **Model version/region**: GPT-4.1 availability varies by region. If the deploy
-  fails on the model, check `az cognitiveservices account list-models` and adjust
-  `modelVersion` in `main.bicepparam`.
+- **Model version/region**: model versions age out fast. `gpt-4.1`,
+  `gpt-4.1-mini`, and `gpt-4o-mini` all hit a deprecating state (~Oct 2026) and
+  Azure blocks them for *new* deployments; the template uses `gpt-5-mini`
+  (2025-08-07, runs to 2027-02-06) on the `GlobalStandard` SKU. If it ever fails
+  on the model, list current options and their deprecation dates with:
+  `az cognitiveservices model list --location eastus2 --query "[?starts_with(model.name,'gpt-')].{n:model.name,v:model.version,dep:model.deprecation.inference}" -o table`
+  then adjust `modelName`/`modelVersion`/`skuName` in `main.bicepparam`.
 - **RBAC propagation**: role assignments can take a few minutes to take effect —
   a 401/403 immediately after deploy usually just means "wait and retry".
 - **Cost**: an idle Azure OpenAI resource costs nothing; you pay per token. The
