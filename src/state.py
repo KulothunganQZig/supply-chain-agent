@@ -6,8 +6,11 @@ The message type determines which handler is invoked on the receiving executor.
 
 from pydantic import BaseModel, Field
 
+from src.models.erp import PurchaseOrder
 from src.models.gps import GPSReading
+from src.models.inventory import Inventory
 from src.models.milestone import Milestone
+from src.models.sales_order import SalesOrder
 from src.models.shipment import Shipment
 
 
@@ -18,6 +21,9 @@ class IngestedData(BaseModel):
     milestones: list[Milestone] = []
     gps_readings: list[GPSReading] = []
     email_summaries: list[dict] = Field(default_factory=list)
+    purchase_orders: list[PurchaseOrder] = Field(default_factory=list)
+    sales_orders: list[SalesOrder] = Field(default_factory=list)
+    inventory: list[Inventory] = Field(default_factory=list)
 
 
 class RiskAlert(BaseModel):

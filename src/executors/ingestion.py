@@ -13,8 +13,11 @@ from agent_framework import Executor, WorkflowContext, handler
 
 from src.db import async_session
 from src.models.email import CarrierEmail, CarrierEmailTable
+from src.models.erp import PurchaseOrder, PurchaseOrderTable
 from src.models.gps import GPSReading, GPSReadingTable
+from src.models.inventory import Inventory, InventoryTable
 from src.models.milestone import Milestone, MilestoneTable
+from src.models.sales_order import SalesOrder, SalesOrderTable
 from src.models.shipment import Shipment, ShipmentTable
 from src.state import IngestedData
 
@@ -87,18 +90,53 @@ class IngestionExecutor(Executor):
             })
         logger.info(f"  Fetched {len(email_summaries)} carrier emails")
 
-        # 5. Assemble and forward
+        # 5. Fetch purchase orders backing those shipments
+        po_ids = [s.po_id for s in shipments]
+        async with async_session() as session:
+            result = await session.execute(
+                select(PurchaseOrderTable).where(PurchaseOrderTable.po_id.in_(po_ids))
+            )
+            po_rows = result.scalars().all()
+
+        purchase_orders = [PurchaseOrder.model_validate(row) for row in po_rows]
+        logger.info(f"  Fetched {len(purchase_orders)} purchase orders")
+
+        # 6. Fetch inventory and sales orders for the materials those POs carry
+        materials = list({po.material for po in purchase_orders})
+        async with async_session() as session:
+            result = await session.execute(
+                select(InventoryTable).where(InventoryTable.material.in_(materials))
+            )
+            inventory_rows = result.scalars().all()
+
+        inventory = [Inventory.model_validate(row) for row in inventory_rows]
+        logger.info(f"  Fetched {len(inventory)} inventory records")
+
+        async with async_session() as session:
+            result = await session.execute(
+                select(SalesOrderTable).where(SalesOrderTable.material.in_(materials))
+            )
+            so_rows = result.scalars().all()
+
+        sales_orders = [SalesOrder.model_validate(row) for row in so_rows]
+        logger.info(f"  Fetched {len(sales_orders)} sales orders")
+
+        # 7. Assemble and forward
         ingested = IngestedData(
             shipments=shipments,
             milestones=milestones,
             gps_readings=gps_readings,
             email_summaries=email_summaries,
+            purchase_orders=purchase_orders,
+            sales_orders=sales_orders,
+            inventory=inventory,
         )
 
         logger.info(
             f"Ingestion complete: {len(shipments)} shipments, "
             f"{len(milestones)} milestones, {len(gps_readings)} GPS, "
-            f"{len(email_summaries)} emails"
+            f"{len(email_summaries)} emails, {len(purchase_orders)} POs, "
+            f"{len(sales_orders)} sales orders, {len(inventory)} inventory records"
         )
 
         await ctx.send_message(ingested)

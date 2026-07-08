@@ -11,16 +11,18 @@ Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous A
 
 ## Current state (Phase 1 complete, Phase 2 in progress)
 - **DONE**: All 7 mock data tables (POs, Shipments, Inventory, Sales Orders, Milestones, GPS, Emails) with Pydantic + SQLAlchemy models, JSON generation, and SQLite seeding
-- **DONE**: IngestionExecutor reads live from SQLite and assembles IngestedData
+- **DONE**: IngestionExecutor reads live from SQLite — shipments/milestones/GPS/emails plus (as of Impact Analysis) purchase orders, inventory, and sales orders scoped to the materials those POs carry
 - **DONE**: RiskDetectionExecutor scores each shipment across 4 weighted signals (milestone delay, GPS stall, email signal, ETA deviation) and emits RiskAlerts; unit-tested in `tests/test_executors/test_risk_detection.py`
-- **DONE**: Full workflow runs end-to-end across 4 supersteps (verified) — currently surfaces 3 alerts (SH-3001 high, SH-3005 high, SH-3003 medium)
-- **NEXT**: Implement ImpactAnalysisExecutor with real logic (stockout risk via inventory days-of-supply, production stoppage risk, revenue impact) — needs IngestionExecutor extended to also fetch inventory/sales orders/POs, which it doesn't yet
-- **THEN**: MitigationExecutor, terminal executors (AutonomousAction / HumanApproval)
+- **DONE**: ImpactAnalysisExecutor joins each alert to its PO/plant/inventory and to sales orders sharing the same material, then flags stockout risk (below safety stock or days-of-supply ≤ critical threshold) and production stoppage risk (delay ≥ remaining days of supply), plus a rough revenue-at-risk figure (quantity × priority-tier $/unit proxy — no real price data in the mock set); unit-tested in `tests/test_executors/test_impact_analysis.py`
+- **DONE**: Full workflow runs end-to-end across 4 supersteps (verified) — currently surfaces 3 alerts: SH-3001 (high, stockout+stoppage, $290k), SH-3005 (high, stockout+stoppage, $75k), SH-3003 (medium, stockout only, $75k)
+- **NEXT**: Implement MitigationExecutor — this is the first executor expected to call the LLM (Azure OpenAI GPT-4.1) for actual reasoning/tradeoff judgment (expedite vs. reroute vs. switch mode vs. notify), since `MitigationAction.reasoning` is explicitly documented as an LLM reasoning chain
+- **THEN**: terminal executors (AutonomousAction / HumanApproval), routed via `confidence_threshold` / `cost_escalation_threshold`
 
 ## Key files
-- `src/workflow.py` — WorkflowBuilder graph + remaining stub executor classes (3-6)
+- `src/workflow.py` — WorkflowBuilder graph + remaining stub executor (Mitigation) + terminal executors (5-6)
 - `src/executors/ingestion.py` — Live SQLite reads, fully implemented
 - `src/executors/risk_detection.py` — Risk scoring across 4 signals, fully implemented
+- `src/executors/impact_analysis.py` — Stockout/stoppage/revenue impact, fully implemented
 - `src/state.py` — Pydantic message schemas between executors
 - `src/models/` — SQLAlchemy tables + Pydantic schemas (erp.py, shipment.py, inventory.py, sales_order.py, milestone.py, gps.py, email.py)
 - `src/db.py` — Async SQLAlchemy engine + session factory
