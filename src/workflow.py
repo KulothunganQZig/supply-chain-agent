@@ -49,7 +49,7 @@ def build_workflow():
     human_approval = HumanApprovalExecutor(id="human_approval")
 
     workflow = (
-        WorkflowBuilder(start_executor=ingestion)
+        WorkflowBuilder(start_executor=ingestion, output_from=[autonomous_action, human_approval])
         .add_edge(ingestion, risk_detection)
         .add_edge(risk_detection, impact_analysis)
         .add_edge(impact_analysis, mitigation)

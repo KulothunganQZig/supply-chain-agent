@@ -17,7 +17,8 @@ Ingestion → Risk Detection → Impact Analysis → Mitigation → Autonomous A
 - **DONE**: MitigationExecutor decides a primary action per alert (switch_transport_mode / expedite_shipment / notify_carrier by a deterministic decision tree) plus a notify_customer companion when sales orders are affected, then routes every action to auto vs. escalation via `confidence_threshold` / `cost_escalation_threshold`. The `reasoning` field is LLM-generated (Azure OpenAI via `agent_framework_openai.OpenAIChatClient` + AAD auth) when `AZURE_AI_PROJECT_ENDPOINT` is set — this is the first executor wired to call the LLM — and falls back to a deterministic explanation otherwise (any LLM failure is caught, so behavior is identical with or without Azure configured); unit-tested in `tests/test_executors/test_mitigation.py` (LLM path untested locally since no `.env` credentials exist)
 - **DONE**: AutonomousActionExecutor / HumanApprovalExecutor are real (not stubs) — they record simulated execution / pending-approval outcomes as the two terminal `ActionReport` outputs
 - **DONE**: Full workflow runs end-to-end across all 6 executors (verified) — 3 alerts → 6 mitigation actions (3 auto-executed notify_customer, 3 escalated switch_transport_mode/expedite_shipment) — both the autonomous and human-approval branches fire in the same run
-- **NEXT** (per requirement-doc gap check): add a thin FastAPI wrapper (doc's suggested stack lists FastAPI; currently only `python -m src.main`), and make RiskDetectionExecutor/email handling actually parse unstructured email body/subject (currently reads pre-structured `delay_days_mentioned`/`reason` fields, which sidesteps the "unstructured signal" evaluation criterion)
+- **DONE**: Thin FastAPI wrapper (`src/api.py`) — `POST /run` executes the full pipeline and returns JSON; `GET /health`; Swagger docs at `/docs`
+- **NEXT** (per requirement-doc gap check): make email handling actually parse unstructured email body/subject — RiskDetectionExecutor currently reads pre-structured `delay_days_mentioned`/`reason` fields, which sidesteps the "combining structured and unstructured signals" evaluation criterion
 
 ## Key files
 - `src/workflow.py` — WorkflowBuilder graph wiring all 6 executors (no stubs remain)
@@ -104,14 +105,30 @@ outputs = result.get_outputs()
 ```bash
 python -m mock_data.generate    # Generate JSON mock data
 python -m mock_data.seed_db     # Seed SQLite from JSON
-python -m src.main              # Run the full pipeline
+python -m src.main              # Run the full pipeline via CLI
+python -m src.api               # Run the FastAPI server (:8000) — POST /run, GET /health
 pytest tests/                   # Run tests
 ```
 
+## API (src/api.py)
+Thin FastAPI wrapper — no logic beyond `src/workflow.py`, just shapes workflow
+events into JSON:
+- `GET /health` → `{"status": "ok"}`
+- `POST /run` → runs all 6 executors once, returns `alerts`, `impact_assessments`,
+  `mitigation_actions`, `auto_actions`, `escalation_actions`, `action_reports`
+- Pulled from `WorkflowRunResult`'s `executor_completed` events (`event.data` is
+  `sent_messages + yielded_outputs`, isinstance-routed into the right state.py type)
+  rather than duplicating the workflow graph
+- Interactive docs at `/docs` (Swagger) and `/redoc` for free via FastAPI
+- `tests/test_api.py` regenerates + reseeds the SQLite DB before running (unlike the
+  executor tests, which construct `IngestedData` in memory and never touch the DB)
+
 ## Conventions
-- One executor per agent, stubs currently in src/workflow.py (move to src/executors/ as implemented)
+- One executor per agent — all 6 now real, in `src/executors/` (no stubs remain in `src/workflow.py`)
 - Pydantic models for API/validation, SQLAlchemy models for DB — both in src/models/
-- Config-driven thresholds (never hardcode)
+- Config-driven thresholds (never hardcode); heuristic proxies with no real backing data
+  (revenue-per-unit, mitigation action costs) are documented module constants, not settings
 - Full file replacements preferred over incremental edits
 - Commit after each working step
 - Database is SQLite locally (supply_chain.db), Azure SQL in production — same SQLAlchemy code
+- Shared CLI/API startup (`.env` load + logging) lives in `src/bootstrap.py`

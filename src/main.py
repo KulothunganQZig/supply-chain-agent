@@ -7,19 +7,10 @@ Usage:
 import asyncio
 import logging
 
-from dotenv import load_dotenv
-from rich.logging import RichHandler
-
-from src.config import settings
+from src.bootstrap import bootstrap
 from src.workflow import build_workflow
 
-load_dotenv()
-
-logging.basicConfig(
-    level=settings.log_level,
-    format="%(message)s",
-    handlers=[RichHandler(rich_tracebacks=True)],
-)
+bootstrap()
 logger = logging.getLogger("supply_chain_agent")
 
 
@@ -40,7 +31,7 @@ async def run_pipeline():
         for output in outputs:
             logger.info(f"Workflow output: {output}")
     else:
-        logger.info("Pipeline completed (no terminal outputs — expected until Phase 2)")
+        logger.info("Pipeline completed with no terminal outputs (no risk alerts were raised)")
 
     logger.info("Pipeline execution complete.")
 
