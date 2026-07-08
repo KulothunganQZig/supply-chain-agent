@@ -1,68 +1,125 @@
-// Azure OpenAI resource + model deployment + keyless RBAC for the
-// Supply Chain Visibility Agent (migration Phase 1, Azure OpenAI only).
+// Full-stack IaC for the Supply Chain Visibility Agent — the declarative source
+// of truth for the whole Azure deployment (Log Analytics, Managed Identity, ACR,
+// Azure OpenAI, Azure SQL, Container Apps), all keyless via one user-assigned
+// Managed Identity.
 //
-// Deploy:
+// The live environment was first bootstrapped imperatively with `az` (see
+// README.md + container-apps.md); this template captures that same stack
+// declaratively. Deploy to a fresh resource group:
 //   az group create -n rg-supplychain-agent -l eastus2
-//   az deployment group create -g rg-supplychain-agent \
-//     -f infra/main.bicep -p infra/main.bicepparam
+//   az deployment group create -g rg-supplychain-agent -f infra/main.bicep -p infra/main.bicepparam
 //
-// After deploy, the output `azureOpenAIEndpoint` goes into .env as
-// AZURE_OPENAI_ENDPOINT, and MODEL_DEPLOYMENT_NAME = the `modelDeploymentName`.
+// One step is NOT expressible in Bicep: granting the Managed Identity a SQL
+// contained-user (data-plane access is T-SQL, not ARM) — run infra/sql-grant.sql
+// once as the AAD admin after deploy.
+//
+// The image must exist in ACR before the Container App can start — build it with
+// `az acr build --registry <acr> --image supply-chain-agent:<tag> .` (see
+// container-apps.md), then deploy/point this template at that tag.
 
-@description('Azure region for all resources.')
+// ---------------------------------------------------------------------------
+// Parameters
+// ---------------------------------------------------------------------------
+
+@description('Region for most resources.')
 param location string = resourceGroup().location
 
-@description('Globally-unique name for the Azure OpenAI resource.')
+@description('Region for Azure SQL (East regions were capacity-blocked at bootstrap).')
+param sqlLocation string = 'westus3'
+
+@description('Object ID of the AAD admin (SQL admin + OpenAI User for local dev).')
+param aadAdminObjectId string
+
+@description('UPN / display name of the AAD admin.')
+param aadAdminName string
+
+@description('Container image tag (must already be built + pushed to the ACR).')
+param imageTag string = 'v2'
+
+// Resource names — defaulted to the live deployment so a redeploy aligns.
+param identityName string = 'id-supplychain-app'
+param acrName string = 'acrsupplychain85768'
 param openAiName string = 'oai-supplychain-${uniqueString(resourceGroup().id)}'
+param sqlServerName string = 'sql-sc-309221'
+param sqlDatabaseName string = 'scdb'
+param logAnalyticsName string = 'log-supplychain'
+param containerEnvName string = 'cae-supplychain'
+param containerAppName string = 'ca-supplychain'
 
-@description('Model deployment name — must match MODEL_DEPLOYMENT_NAME in the app config.')
+// Model
 param modelDeploymentName string = 'gpt-5-mini'
-
-@description('Underlying model to deploy.')
 param modelName string = 'gpt-5-mini'
-
-@description('Model version. Check availability/deprecation with: az cognitiveservices model list --location <loc>.')
 param modelVersion string = '2025-08-07'
-
-@description('Deployment SKU. gpt-5-mini offers GlobalStandard (not regional Standard). Verify per model+region.')
-param skuName string = 'GlobalStandard'
-
-@description('Tokens-per-minute capacity, in thousands (e.g. 30 = 30K TPM).')
+param modelSku string = 'GlobalStandard'
 param modelCapacity int = 30
+param openAiApiVersion string = '2025-04-01-preview'
 
-@description('Object ID of the principal (your user for local dev, or a Managed Identity) to grant OpenAI access.')
-param principalId string
+// Built-in role definition IDs (constant across tenants)
+var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
-@description('Principal type: User for `az login` dev auth, ServicePrincipal for a Managed Identity.')
-@allowed([
-  'User'
-  'ServicePrincipal'
-])
-param principalType string = 'User'
+// ---------------------------------------------------------------------------
+// Identity + observability
+// ---------------------------------------------------------------------------
 
-// --- Azure OpenAI resource (Cognitive Services account, kind = OpenAI) ---
+resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: identityName
+  location: location
+}
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: logAnalyticsName
+  location: location
+  properties: {
+    sku: { name: 'PerGB2018' }
+    retentionInDays: 30
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Container Registry
+// ---------------------------------------------------------------------------
+
+resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
+  name: acrName
+  location: location
+  sku: { name: 'Basic' }
+  properties: {
+    adminUserEnabled: false
+  }
+}
+
+resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, identity.id, acrPullRoleId)
+  scope: acr
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Azure OpenAI
+// ---------------------------------------------------------------------------
+
 resource openAi 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: openAiName
   location: location
   kind: 'OpenAI'
-  sku: {
-    name: 'S0'
-  }
+  sku: { name: 'S0' }
   properties: {
-    // Custom subdomain is required for AAD/token auth (the keyless path).
     customSubDomainName: openAiName
     publicNetworkAccess: 'Enabled'
-    // Disable local API keys so the only way in is AAD — enforces the keyless design.
     disableLocalAuth: true
   }
 }
 
-// --- Model deployment ---
-resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openAi
   name: modelDeploymentName
   sku: {
-    name: skuName
+    name: modelSku
     capacity: modelCapacity
   }
   properties: {
@@ -74,22 +131,149 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01
   }
 }
 
-// --- RBAC: Cognitive Services OpenAI User (data-plane inference access) ---
-// Role definition ID is a well-known built-in GUID, constant across tenants.
-var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-
-resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(openAi.id, principalId, openAiUserRoleId)
+// OpenAI User for both the app identity (runtime) and the AAD admin (local dev)
+resource openAiUserForApp 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(openAi.id, identity.id, openAiUserRoleId)
   scope: openAi
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
-    principalId: principalId
-    principalType: principalType
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
-@description('Set this as AZURE_OPENAI_ENDPOINT in .env.')
-output azureOpenAIEndpoint string = openAi.properties.endpoint
+resource openAiUserForAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(openAi.id, aadAdminObjectId, openAiUserRoleId)
+  scope: openAi
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+    principalId: aadAdminObjectId
+    principalType: 'User'
+  }
+}
 
-@description('Set this as MODEL_DEPLOYMENT_NAME in .env.')
-output modelDeploymentName string = modelDeploymentName
+// ---------------------------------------------------------------------------
+// Azure SQL (AAD-only auth; the app connects keyless via ActiveDirectoryMsi)
+// ---------------------------------------------------------------------------
+
+resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
+  name: sqlServerName
+  location: sqlLocation
+  properties: {
+    administrators: {
+      administratorType: 'ActiveDirectory'
+      principalType: 'User'
+      login: aadAdminName
+      sid: aadAdminObjectId
+      tenantId: tenant().tenantId
+      azureADOnlyAuthentication: true
+    }
+    minimalTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+  parent: sqlServer
+  name: sqlDatabaseName
+  location: sqlLocation
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
+  }
+  properties: {
+    requestedBackupStorageRedundancy: 'Local'
+  }
+}
+
+// Special 0.0.0.0 rule = "Allow Azure services and resources to access this server"
+resource sqlAllowAzure 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = {
+  parent: sqlServer
+  name: 'AllowAzureServices'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Container Apps
+// ---------------------------------------------------------------------------
+
+resource containerEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+  name: containerEnvName
+  location: location
+  properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: logAnalytics.properties.customerId
+        sharedKey: logAnalytics.listKeys().primarySharedKey
+      }
+    }
+  }
+}
+
+resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: containerAppName
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: containerEnv.id
+    configuration: {
+      ingress: {
+        external: true
+        targetPort: 8000
+        transport: 'auto'
+      }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: identity.id
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'app'
+          image: '${acr.properties.loginServer}/supply-chain-agent:${imageTag}'
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
+            { name: 'AZURE_OPENAI_ENDPOINT', value: openAi.properties.endpoint }
+            { name: 'AZURE_OPENAI_API_VERSION', value: openAiApiVersion }
+            { name: 'MODEL_DEPLOYMENT_NAME', value: modelDeploymentName }
+            { name: 'AZURE_SQL_SERVER', value: '${sqlServer.name}${environment().suffixes.sqlServerHostname}' }
+            { name: 'AZURE_SQL_DATABASE', value: sqlDatabaseName }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 0
+        maxReplicas: 1
+      }
+    }
+  }
+  dependsOn: [
+    acrPull
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// Outputs
+// ---------------------------------------------------------------------------
+
+output appFqdn string = containerApp.properties.configuration.ingress.fqdn
+output acrLoginServer string = acr.properties.loginServer
+output azureOpenAIEndpoint string = openAi.properties.endpoint
+output managedIdentityClientId string = identity.properties.clientId
+output managedIdentityName string = identity.name

@@ -1,10 +1,36 @@
-# Azure provisioning — Phase 1 (Azure OpenAI only)
+# Azure provisioning
 
-Stands up the Azure OpenAI resource + model deployment that lights up the LLM
-reasoning ([mitigation.py](../src/executors/mitigation.py)) and email-parsing
-([email_parsing.py](../src/email_parsing.py)) hooks. Keyless: auth is AAD-only
-(`disableLocalAuth: true`), so there is **no API key to copy** — access is
-granted by RBAC role assignment instead.
+## `main.bicep` — full-stack IaC (declarative source of truth)
+
+`main.bicep` now provisions the **entire** stack — Log Analytics, user-assigned
+Managed Identity, ACR, Azure OpenAI (+ gpt-5-mini), Azure SQL (server/db/firewall),
+and Container Apps (env + app) — all keyless via the one identity. It's the
+go-forward declarative IaC for standing up a fresh environment.
+
+**Status:** compile-validated (`az bicep build`) and what-if'd against the live
+RG — it converges (6 resources NoChange). The remaining diffs are benign and
+expected: the live stack was **bootstrapped imperatively with `az`** (see
+`container-apps.md`), so role assignments have different (random vs. deterministic
+`guid()`) names, the Log Analytics workspace is explicitly named here, and a few
+properties normalize. The template is intentionally **not re-applied** over the
+working live stack; deploy it to a **fresh** resource group for a clean rebuild:
+
+```bash
+az group create -n rg-supplychain-agent -l eastus2
+# build + push the image first (the app won't start without it):
+az acr build --registry <acrName> --image supply-chain-agent:v2 .
+az deployment group create -g rg-supplychain-agent -f infra/main.bicep -p infra/main.bicepparam
+# then the one non-ARM step — grant the MI a SQL user (infra/sql-grant.sql)
+```
+
+One step is not expressible in Bicep: the SQL contained-user grant (data-plane
+access is T-SQL, not ARM) — run `infra/sql-grant.sql` once as the AAD admin.
+
+---
+
+Historical note — Phase 1 originally stood up **only** the Azure OpenAI resource.
+That resource is keyless (AAD-only, `disableLocalAuth: true`), so there is **no
+API key to copy** — access is by RBAC role assignment.
 
 ## Prerequisites
 
