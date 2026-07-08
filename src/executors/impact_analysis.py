@@ -107,4 +107,6 @@ class ImpactAnalysisExecutor(Executor):
                 f"stoppage={a.production_stoppage_risk} | revenue=${a.estimated_revenue_impact:,.0f}"
             )
 
-        await ctx.send_message(ImpactReport(assessments=assessments, alerts=message.alerts))
+        await ctx.send_message(
+            ImpactReport(assessments=assessments, alerts=message.alerts, ingested_data=data)
+        )

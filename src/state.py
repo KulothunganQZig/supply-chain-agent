@@ -65,6 +65,7 @@ class ImpactReport(BaseModel):
 
     assessments: list[ImpactAssessment] = []
     alerts: list[RiskAlert] = []
+    ingested_data: IngestedData | None = None
 
 
 class MitigationAction(BaseModel):

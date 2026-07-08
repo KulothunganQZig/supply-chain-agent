@@ -7,54 +7,19 @@
                                   Autonomous Action      Human Approval
 """
 
-from typing_extensions import Never
+from agent_framework import WorkflowBuilder
 
-from agent_framework import Executor, WorkflowBuilder, WorkflowContext, handler
-
+from src.executors.autonomous_action import AutonomousActionExecutor
+from src.executors.human_approval import HumanApprovalExecutor
 from src.executors.impact_analysis import ImpactAnalysisExecutor
 from src.executors.ingestion import IngestionExecutor
+from src.executors.mitigation import MitigationExecutor
 from src.executors.risk_detection import RiskDetectionExecutor
-from src.state import (
-    ActionReport,
-    ImpactReport,
-    MitigationPlan,
-)
+from src.state import MitigationPlan
 
 import logging
 
 logger = logging.getLogger("supply_chain_agent.workflow")
-
-
-# ---------------------------------------------------------------------------
-# Stub executors (Phase 2: these will get real logic)
-# ---------------------------------------------------------------------------
-
-class MitigationExecutor(Executor):
-    @handler
-    async def process(self, message: ImpactReport, ctx: WorkflowContext[MitigationPlan]) -> None:
-        logger.info(f"Mitigation: proposing actions for {len(message.assessments)} impacts...")
-        # TODO Phase 2: implement real mitigation logic
-        await ctx.send_message(MitigationPlan(actions=[], auto_actions=[], escalation_actions=[]))
-
-
-class AutonomousActionExecutor(Executor):
-    @handler
-    async def process(self, message: MitigationPlan, ctx: WorkflowContext[Never, ActionReport]) -> None:
-        logger.info(f"Autonomous action: executing {len(message.auto_actions)} actions...")
-        await ctx.yield_output(ActionReport(
-            executed_actions=[],
-            summary=f"Executed {len(message.auto_actions)} autonomous actions.",
-        ))
-
-
-class HumanApprovalExecutor(Executor):
-    @handler
-    async def process(self, message: MitigationPlan, ctx: WorkflowContext[Never, ActionReport]) -> None:
-        logger.info(f"Human approval: escalating {len(message.escalation_actions)} actions...")
-        await ctx.yield_output(ActionReport(
-            pending_approvals=message.escalation_actions,
-            summary=f"Escalated {len(message.escalation_actions)} actions for review.",
-        ))
 
 
 # ---------------------------------------------------------------------------
