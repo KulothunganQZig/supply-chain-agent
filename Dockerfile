@@ -8,7 +8,9 @@
 # Identity (DefaultAzureCredential); no key is baked in. Run locally without
 # Azure creds and the LLM hooks fall back to their deterministic path.
 
-FROM python:3.12-slim
+# Pinned to Debian 12 (bookworm) — the Microsoft ODBC repo below targets bookworm;
+# python:3.12-slim now tracks Debian 13 (trixie), which the MS repo doesn't cover.
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -17,12 +19,11 @@ ENV PYTHONUNBUFFERED=1 \
 # Microsoft ODBC Driver 18 + unixODBC — required by aioodbc/pyodbc for the
 # keyless Azure SQL connection (ActiveDirectoryMsi). Not needed for the SQLite
 # path, but baked in so the same image works against either backend.
+# One clean repo line (a single [...] option group — apt rejects two).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl gnupg ca-certificates \
     && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
-    && curl -sSL https://packages.microsoft.com/config/debian/12/prod.list \
-        | sed 's|https://|[signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://|' \
-        > /etc/apt/sources.list.d/mssql-release.list \
+    && echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc \
     && apt-get purge -y curl gnupg \
