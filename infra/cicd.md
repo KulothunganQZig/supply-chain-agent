@@ -35,11 +35,14 @@ Add three **repository secrets** (Settings → Secrets and variables → Actions
 New repository secret). These are IDs, not credentials — the OIDC exchange is
 what actually authenticates:
 
-| Secret | Value |
+| Secret | Value (get with the command shown) |
 |---|---|
-| `AZURE_CLIENT_ID` | `ff93b23b-0775-4cea-8c12-4c9815296f23` (id-supplychain-cicd) |
-| `AZURE_TENANT_ID` | `30f43a59-83f4-4883-b650-4a3e36a194f3` |
-| `AZURE_SUBSCRIPTION_ID` | `5268915a-77ef-4b6a-a224-b0e54217e3f0` |
+| `AZURE_CLIENT_ID` | `az identity show -g $RG -n id-supplychain-cicd --query clientId -o tsv` |
+| `AZURE_TENANT_ID` | `az account show --query tenantId -o tsv` |
+| `AZURE_SUBSCRIPTION_ID` | `az account show --query id -o tsv` |
+
+(These are non-secret identifiers, but they live only in GitHub secrets — not
+committed here — so this doc stays clean and repo-portable.)
 
 Then push to `main` — the workflow lints, tests, builds `supply-chain-agent:<sha>`
 in ACR, and rolls the Container App to it.
