@@ -43,6 +43,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# App Insights (no-op unless APPLICATIONINSIGHTS_CONNECTION_STRING is set).
+from src.telemetry import setup_telemetry  # noqa: E402
+
+setup_telemetry(app)
+
 
 @app.get("/health")
 async def health() -> dict:
