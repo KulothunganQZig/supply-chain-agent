@@ -29,10 +29,26 @@ async def lifespan(app: FastAPI):
     Baked-in SQLite is already seeded at build time, so this is effectively a
     no-op there; on a fresh Azure SQL database it creates the tables and loads
     the mock data (idempotent — skips if already populated).
+
+    Retries a few times: Azure SQL (Basic, cross-region) can be slow to accept
+    the first cold connection, and a single transient login timeout should ride
+    through here rather than crash-looping the whole container.
     """
+    import asyncio
+
     from mock_data.seed_db import seed_if_empty
 
-    await seed_if_empty()
+    attempts = 6
+    for attempt in range(1, attempts + 1):
+        try:
+            await seed_if_empty()
+            break
+        except Exception as exc:  # noqa: BLE001 — transient DB connectivity at boot
+            if attempt == attempts:
+                logger.error(f"DB init failed after {attempts} attempts: {exc}")
+                raise
+            logger.warning(f"DB init attempt {attempt}/{attempts} failed ({exc}); retrying in 5s...")
+            await asyncio.sleep(5)
     yield
 
 
