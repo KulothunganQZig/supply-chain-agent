@@ -43,6 +43,7 @@ param openAiName string = 'oai-supplychain-${uniqueString(resourceGroup().id)}'
 param sqlServerName string = 'sql-sc-309221'
 param sqlDatabaseName string = 'scdb'
 param logAnalyticsName string = 'log-supplychain'
+param appInsightsName string = 'appi-supplychain'
 param containerEnvName string = 'cae-supplychain'
 param containerAppName string = 'ca-supplychain'
 
@@ -73,6 +74,18 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   properties: {
     sku: { name: 'PerGB2018' }
     retentionInDays: 30
+  }
+}
+
+// Workspace-based Application Insights — receives the app's OpenTelemetry
+// (HTTP request traces, per-executor / per-LLM-call spans, logs).
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: appInsightsName
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
   }
 }
 
@@ -254,6 +267,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'MODEL_DEPLOYMENT_NAME', value: modelDeploymentName }
             { name: 'AZURE_SQL_SERVER', value: '${sqlServer.name}${environment().suffixes.sqlServerHostname}' }
             { name: 'AZURE_SQL_DATABASE', value: sqlDatabaseName }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
           ]
         }
       ]
@@ -275,5 +289,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 output appFqdn string = containerApp.properties.configuration.ingress.fqdn
 output acrLoginServer string = acr.properties.loginServer
 output azureOpenAIEndpoint string = openAi.properties.endpoint
+output appInsightsConnectionString string = appInsights.properties.ConnectionString
 output managedIdentityClientId string = identity.properties.clientId
 output managedIdentityName string = identity.name
